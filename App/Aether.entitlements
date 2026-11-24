@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!--
+	  Aether is a Developer ID app (outside the Mac App Store). With the sandbox off it can:
+	    - spawn /bin/zsh, /usr/bin/arch, wine64, wineserver as child processes
+	    - read Steam/Epic manifests and external SSD game folders
+	    - create Wine prefixes in ~/Library/Application Support/Aether/Bottles
+	  Keep Hardened Runtime ON (required for notarization). Aether needs NO hardened-runtime
+	  exceptions: it does not JIT, load unsigned libraries, or rely on DYLD_* for itself.
+	  Child processes such as Wine are separate executables and are not bound by Aether's
+	  hardened runtime.
+	-->
+	<key>com.apple.security.app-sandbox</key>
+	<false/>
+</dict>
+</plist>

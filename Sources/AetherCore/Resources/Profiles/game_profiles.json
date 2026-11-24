@@ -1,0 +1,44 @@
+{
+  "schema_version": "1.0",
+  "profiles": [
+    {
+      "id": "cyberpunk-2077",
+      "title": "Cyberpunk 2077",
+      "steam_app_id": "1091500",
+      "has_kernel_anticheat": false,
+      "native_macos_available": true,
+      "min_local_tier": 2,
+      "preferred_engine": "native",
+      "local_translation": {
+        "backend": "d3dmetal",
+        "windows_version": "win10",
+        "env_vars": {
+          "WINEESYNC": "1",
+          "WINEMSYNC": "1",
+          "D3DM_ENABLE_METALFX": "1",
+          "MTL_HUD_ENABLED": "1"
+        },
+        "launch_args": ["--launcher-skip", "-skipStartScreen"]
+      },
+      "cloud_fallback": {
+        "geforce_now_id": "cyberpunk_2077_steam",
+        "moonlight_app_name": "Cyberpunk 2077"
+      }
+    },
+    {
+      "id": "valorant",
+      "title": "VALORANT",
+      "steam_app_id": null,
+      "has_kernel_anticheat": true,
+      "anticheat_name": "Riot Vanguard",
+      "native_macos_available": false,
+      "min_local_tier": 99,
+      "preferred_engine": "cloud",
+      "local_translation": null,
+      "cloud_fallback": {
+        "geforce_now_id": null,
+        "moonlight_app_name": "VALORANT"
+      }
+    }
+  ]
+}
