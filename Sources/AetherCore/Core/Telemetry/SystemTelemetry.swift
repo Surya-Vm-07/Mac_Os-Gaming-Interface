@@ -90,9 +90,9 @@ public struct SystemTelemetry: Sendable {
         guard result == KERN_SUCCESS else { return nil }
 
         let pageSize = UInt64(MacHardwareProfiler.sysctlInteger("hw.pagesize", as: Int64.self) ?? 16_384)
-        let internal = UInt64(stats.internal_page_count)
+        let internalPages = UInt64(stats.internal_page_count)
         let purgeable = UInt64(stats.purgeable_count)
-        let appMemory = internal > purgeable ? internal - purgeable : 0
+        let appMemory = internalPages > purgeable ? internalPages - purgeable : 0
         let pages = appMemory + UInt64(stats.wire_count) + UInt64(stats.compressor_page_count)
         return pages * pageSize
     }
