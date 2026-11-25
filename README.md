@@ -10,8 +10,8 @@ A native, controller-first gaming orchestrator for Apple Silicon Macs. It routes
 
 | Phase | Scope | State |
 | --- | --- | --- |
-| 1 | Hardware profiler, models, router, manifest loader, BottleEngine, CLI | **Implemented, awaiting first macOS build** |
-| 2 | SwiftUI shell, library scanner, artwork | Not started |
+| 1 | Hardware profiler, models, router, manifest loader, BottleEngine, CLI | Done (builds and tests green on macOS) |
+| 2 | SwiftUI shell, library scanner, artwork | **Implemented, awaiting macOS build** |
 | 3 | GCController focus engine, Quick Overlay Drawer | Not started |
 | 4 | Streaming engine | Not started |
 
@@ -36,6 +36,33 @@ swift test
 Two `BottleEngine` tests spawn real processes, using fake `wine64` / `wineserver` shell scripts.
 They are skipped automatically when Rosetta 2 is not installed.
 
+## Run the shell (Phase 2)
+
+```bash
+swift run AetherApp
+```
+
+Keys: arrows move, Return/Space plays, Shift+Return plays locally (low-spec override), R rescans,
+Esc dismisses messages. Controller support lands in Phase 3 on the same view-model API.
+
+To launch Windows games from the UI before the Settings screen exists:
+
+```bash
+AETHER_WINE=/path/to/wine64 AETHER_D3DMETAL=/path/to/gptk/redist/lib/external swift run AetherApp
+```
+
+### Artwork
+
+Without a key, Steam games use Steam's public CDN. For everything else, add a free SteamGridDB API
+key (steamgriddb.com → Preferences → API). It is stored in the login Keychain:
+
+```bash
+swift run aether set-artwork-key YOUR_KEY
+```
+
+Artwork is cached in `~/Library/Caches/Aether/Artwork`. The UI decodes it at display size into a
+capped in-memory cache, and drops that cache when a game launches or Aether goes to the background.
+
 ## Phase 1 CLI
 
 ```bash
@@ -44,6 +71,10 @@ swift run aether hw
 
 ```bash
 swift run aether profiles
+```
+
+```bash
+swift run aether scan --artwork
 ```
 
 ```bash
@@ -73,20 +104,28 @@ Sources/AetherCore/
   Core/Routing/EngineRouter           3-engine decision core (pure)
   Core/Routing/GameManifestLoader     bundled + user JSON profiles, merged by id
   Core/Engines/BottleEngine           actor: spawn, log stream, wineserver-aware lifecycle
+  Core/Input/GridNavigator            pure grid focus math (keyboard now, gamepad in Phase 3)
+  Services/VDF                        Valve KeyValues parser
+  Services/LibraryScanner             Steam libraries (incl. Wine-prefix Steam), Games apps, custom folders
+  Services/ArtworkFetcher             SteamGridDB + Steam CDN → disk cache (file URLs only)
+  Services/SecretStore                Keychain-backed API keys
+Sources/AetherUI/                     Theme, ExecutionBadge, GameCardView, ImagePipeline, LibraryHomeView, LibraryViewModel
+Sources/AetherApp/                    SwiftPM dev host for the SwiftUI shell
   Resources/Profiles/game_profiles.json
   Resources/Scripts/launch_d3dmetal.sh
 Sources/AetherCLI/                    Phase 1 proof-of-concept CLI
 Tests/AetherCoreTests/                Swift Testing suites
 ```
 
-## App target setup (Phase 2)
+## Signed app target (when you are ready to distribute)
 
 SwiftPM cannot produce a signed `.app` with entitlements, so the SwiftUI shell gets an Xcode app
 target that links `AetherCore`:
 
 1. In Xcode, choose **File → New → Project → macOS → App**. Name it `Aether`, set Interface to
    SwiftUI and Language to Swift. Save it in `App/`.
-2. Choose **File → Add Package Dependencies → Add Local…**, pick the repo root, then link `AetherCore`.
+2. Choose **File → Add Package Dependencies → Add Local…**, pick the repo root, then link `AetherUI`.
+   Use `Sources/AetherApp/AetherApp.swift` as the app's entry point.
 3. Under **Signing & Capabilities**, remove **App Sandbox** and keep **Hardened Runtime**. Set
    *Code Signing Entitlements* to `App/Aether.entitlements`.
 4. Merge `App/Info-Additions.plist` into the target's Info.plist.

@@ -14,7 +14,11 @@ let package = Package(
     ],
     products: [
         .library(name: "AetherCore", targets: ["AetherCore"]),
+        .library(name: "AetherUI", targets: ["AetherUI"]),
         .executable(name: "aether", targets: ["AetherCLI"]),
+        // Development host for the SwiftUI shell: `swift run AetherApp`.
+        // The signed, non-sandboxed .app is an Xcode target that links AetherUI (see README).
+        .executable(name: "AetherApp", targets: ["AetherApp"]),
     ],
     targets: [
         // Engine core: models, hardware profiler, router, manifest loader, bottle engine.
@@ -26,6 +30,17 @@ let package = Package(
                 .copy("Resources/Profiles"),
                 .copy("Resources/Scripts"),
             ]
+        ),
+        // Phase 2 SwiftUI shell: theme, components, screens, view models.
+        .target(
+            name: "AetherUI",
+            dependencies: ["AetherCore"],
+            path: "Sources/AetherUI"
+        ),
+        .executableTarget(
+            name: "AetherApp",
+            dependencies: ["AetherUI"],
+            path: "Sources/AetherApp"
         ),
         // Phase 1 CLI proof-of-concept: `aether hw | profiles | route | launch`.
         .executableTarget(

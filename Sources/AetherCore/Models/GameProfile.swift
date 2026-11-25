@@ -9,17 +9,22 @@ public struct LocalTranslationConfig: Codable, Sendable, Equatable {
     public var envVars: [String: String]
     /// Extra arguments passed to the game executable.
     public var launchArgs: [String]
+    /// Path of the game .exe relative to its install folder (e.g. `bin/x64/Cyberpunk2077.exe`).
+    /// When it is missing, `LibraryScanner` falls back to a heuristic.
+    public var executable: String?
 
     public init(
         backend: TranslationBackend = .d3dmetal,
         windowsVersion: String = "win10",
         envVars: [String: String] = [:],
-        launchArgs: [String] = []
+        launchArgs: [String] = [],
+        executable: String? = nil
     ) {
         self.backend = backend
         self.windowsVersion = windowsVersion
         self.envVars = envVars
         self.launchArgs = launchArgs
+        self.executable = executable
     }
 
     enum CodingKeys: String, CodingKey {
@@ -27,6 +32,7 @@ public struct LocalTranslationConfig: Codable, Sendable, Equatable {
         case windowsVersion = "windows_version"
         case envVars = "env_vars"
         case launchArgs = "launch_args"
+        case executable
     }
 
     public init(from decoder: any Decoder) throws {
@@ -35,6 +41,7 @@ public struct LocalTranslationConfig: Codable, Sendable, Equatable {
         windowsVersion = try c.decodeIfPresent(String.self, forKey: .windowsVersion) ?? "win10"
         envVars = try c.decodeIfPresent([String: String].self, forKey: .envVars) ?? [:]
         launchArgs = try c.decodeIfPresent([String].self, forKey: .launchArgs) ?? []
+        executable = try c.decodeIfPresent(String.self, forKey: .executable)
     }
 }
 

@@ -12,6 +12,7 @@
       "local_translation": {
         "backend": "d3dmetal",
         "windows_version": "win10",
+        "executable": "bin/x64/Cyberpunk2077.exe",
         "env_vars": {
           "WINEESYNC": "1",
           "WINEMSYNC": "1",

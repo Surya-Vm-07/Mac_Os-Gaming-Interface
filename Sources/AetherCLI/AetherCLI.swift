@@ -1,11 +1,14 @@
 import AetherCore
 import Dispatch
 import Foundation
+import Security
 
 /// Phase 1 proof-of-concept CLI. It exercises the engine core without any UI.
 ///
 ///   aether hw
 ///   aether profiles
+///   aether scan [--steam-root DIR] [--folder DIR] [--artwork]
+///   aether set-artwork-key <steamgriddb-api-key>
 ///   aether route <profile-id> [--native-app PATH] [--exe PATH] [--prefer-local]
 ///   aether launch --wine PATH --d3dmetal DIR --exe PATH
 ///                 [--wineserver PATH] [--bottle DIR] [--profile ID] [--no-hud] [-- GAME_ARGS...]
@@ -25,6 +28,10 @@ struct AetherCLI {
                 printHardware()
             case "profiles":
                 try printProfiles()
+            case "scan":
+                try await scan(Options(arguments, valued: ["--steam-root", "--folder"]))
+            case "set-artwork-key":
+                try setArtworkKey(Options(arguments, valued: []))
             case "route":
                 try route(Options(arguments, valued: ["--native-app", "--exe"]))
             case "launch":
@@ -67,6 +74,50 @@ struct AetherCLI {
             print("\(profile.id.padding(toLength: 24, withPad: " ", startingAt: 0)) \(profile.title)  min-tier \(profile.minLocalTier)\(ac)")
         }
         for issue in catalog.issues { printError("manifest: \(issue)") }
+    }
+
+    static func scan(_ options: Options) async throws {
+        let catalog = try GameManifestLoader().load()
+        var configuration = LibraryScanner.Configuration.standard
+        if let root = options.values["--steam-root"] {
+            configuration.steamRoots.append(URL(filePath: root, directoryHint: .isDirectory))
+        }
+        if let folder = options.values["--folder"] {
+            configuration.customDirectories.append(URL(filePath: folder, directoryHint: .isDirectory))
+        }
+
+        let result = LibraryScanner(configuration: configuration, catalog: catalog).scan()
+        let router = EngineRouter()
+        let hardware = MacHardwareProfiler.current
+        let fetcher = options.flags.contains("--artwork")
+            ? ArtworkFetcher(apiKey: SecretStore.steamGridDBAPIKey())
+            : nil
+
+        print("\(result.games.count) games on \(hardware.chipName), \(hardware.tier)\n")
+        for game in result.games {
+            let profile = game.profileID.flatMap { catalog.profile(id: $0) } ?? .generic(for: game)
+            let badge: String
+            do {
+                badge = try router.route(profile: profile, installation: game.installation, hardware: hardware).engine.badgeLabel
+            } catch {
+                badge = "UNAVAILABLE"
+            }
+            print("[\(badge)] \(game.title)  (\(game.id))")
+            if let app = game.installation.nativeApplication { print("    app: \(app.path(percentEncoded: false))") }
+            if let exe = game.installation.windowsExecutable { print("    exe: \(exe.path(percentEncoded: false))") }
+            if let fetcher {
+                let cover = await fetcher.artwork(.grid, for: game)
+                print("    art: \(cover?.path(percentEncoded: false) ?? "none")")
+            }
+        }
+        for issue in result.issues { printError("scan: \(issue)") }
+    }
+
+    static func setArtworkKey(_ options: Options) throws {
+        guard let key = options.positionals.first, !key.isEmpty else { throw CLIError.missing("<steamgriddb-api-key>") }
+        let status = SecretStore.write(key, service: SecretStore.steamGridDBService)
+        guard status == errSecSuccess else { throw CLIError.keychain(status) }
+        print("SteamGridDB key saved to the login Keychain.")
     }
 
     static func route(_ options: Options) throws {
@@ -160,6 +211,8 @@ struct AetherCLI {
         usage:
           aether hw
           aether profiles
+          aether scan [--steam-root DIR] [--folder DIR] [--artwork]
+          aether set-artwork-key <steamgriddb-api-key>
           aether route <profile-id> [--native-app PATH] [--exe PATH] [--prefer-local]
           aether launch --wine PATH --d3dmetal DIR --exe PATH
                         [--wineserver PATH] [--bottle DIR] [--profile ID] [--no-hud] [-- GAME_ARGS...]
@@ -175,12 +228,14 @@ enum CLIError: Error, CustomStringConvertible {
     case missing(String)
     case unknownProfile(String)
     case noLocalConfig(String)
+    case keychain(Int32)
 
     var description: String {
         switch self {
         case .missing(let what): "Missing required argument \(what)."
         case .unknownProfile(let id): "No profile with id '\(id)'. Run `aether profiles`."
         case .noLocalConfig(let id): "Profile '\(id)' has no local_translation block."
+        case .keychain(let status): "Keychain write failed (OSStatus \(status))."
         }
     }
 }

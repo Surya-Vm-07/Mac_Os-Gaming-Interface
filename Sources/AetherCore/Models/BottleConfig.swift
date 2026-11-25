@@ -17,6 +17,11 @@ public enum AetherPaths {
         applicationSupport.appending(path: "Profiles", directoryHint: .isDirectory)
     }
 
+    /// Downloaded artwork: `~/Library/Caches/Aether/Artwork`. The OS may purge it, which is fine.
+    public static var artworkCache: URL {
+        URL.cachesDirectory.appending(path: "Aether/Artwork", directoryHint: .isDirectory)
+    }
+
     public static func bottle(for gameID: String) -> URL {
         bottles.appending(path: gameID, directoryHint: .isDirectory)
     }
@@ -45,6 +50,21 @@ public struct BottleRuntime: Sendable, Equatable {
             ?? wineBinary.deletingLastPathComponent().appending(path: "wineserver")
         self.d3dMetalLibraryDirectory = d3dMetalLibraryDirectory
         self.launcherScript = launcherScript
+    }
+
+    /// Development hook until the Settings screen exists: reads `AETHER_WINE`, `AETHER_D3DMETAL`
+    /// and optionally `AETHER_WINESERVER`. Returns `nil` if the required variables are missing.
+    public static func fromEnvironment(
+        _ environment: [String: String] = ProcessInfo.processInfo.environment
+    ) -> BottleRuntime? {
+        guard let wine = environment["AETHER_WINE"], !wine.isEmpty,
+              let d3d = environment["AETHER_D3DMETAL"], !d3d.isEmpty
+        else { return nil }
+        return BottleRuntime(
+            wineBinary: URL(filePath: wine),
+            wineserverBinary: environment["AETHER_WINESERVER"].map { URL(filePath: $0) },
+            d3dMetalLibraryDirectory: URL(filePath: d3d, directoryHint: .isDirectory)
+        )
     }
 
     /// The `launch_d3dmetal.sh` that ships inside the AetherCore resource bundle.

@@ -4,7 +4,7 @@ import Foundation
 ///
 /// The spec routes Native when an Apple Silicon binary is *installed*. The profile flag
 /// `native_macos_available` only says one *exists*, so the router needs this separate input.
-public struct GameInstallation: Sendable, Equatable {
+public struct GameInstallation: Sendable, Hashable {
     /// `.app` bundle of a native macOS build, if installed.
     public var nativeApplication: URL?
     /// Windows `.exe` to run through Wine, if installed.
