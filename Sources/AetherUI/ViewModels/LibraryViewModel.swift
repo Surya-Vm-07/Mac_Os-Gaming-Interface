@@ -184,6 +184,7 @@ public final class LibraryViewModel {
 
         var configuration = scannerConfiguration
         configuration.manualGames = ManualGameStore.load() // pick up games added since launch
+        configuration.customDirectories += gameFolders
         let catalog = catalog
         let result = await Task.detached(priority: .userInitiated) {
             LibraryScanner(configuration: configuration, catalog: catalog).scan()
@@ -346,13 +347,16 @@ public final class LibraryViewModel {
     }
 
     private func launchNative(_ game: GameItem) async -> Bool {
-        if let appID = game.steamAppID, let steamURL = URL(string: "steam://rungameid/\(appID)") {
-            // Steam games go through Steam so DRM, cloud saves and the overlay work.
+        let steamURL = game.steamAppID.flatMap { URL(string: "steam://rungameid/\($0)") }
+        let steamAvailable = steamURL.map { NSWorkspace.shared.urlForApplication(toOpen: $0) != nil } ?? false
+        if let steamURL, steamAvailable {
+            // Through Steam when it's installed: DRM, cloud saves and the overlay keep working.
             guard NSWorkspace.shared.open(steamURL) else {
-                statusMessage = "Steam isn't installed, so \(game.title) can't start through it."
+                statusMessage = "Steam couldn't start \(game.title)."
                 return false
             }
         } else if let app = game.installation.nativeApplication {
+            // No Steam app (or not a Steam game): open the game's own .app directly.
             if let failure = await openApplication(at: app) {
                 statusMessage = "Could not launch \(game.title): \(failure)"
                 return false
@@ -461,6 +465,58 @@ public final class LibraryViewModel {
             statusMessage = String(describing: error)
             return false
         }
+    }
+
+    // MARK: - Adding games
+
+    /// Extra folders scanned for games (external SSDs etc.), in addition to ~/Documents/Aether Games.
+    public private(set) var gameFolders: [URL] = AetherPreferences.gameFolders
+
+    /// Adds whatever the user picked: a single .exe, one game's folder, or a folder (or drive) of games.
+    public func addGames(at url: URL) async {
+        let isDirectory = (try? url.resourceValues(forKeys: [.isDirectoryKey]).isDirectory) == true
+        if !isDirectory {
+            guard url.pathExtension.lowercased() == "exe" else {
+                statusMessage = "Pick a Windows .exe, a game folder, or a folder of games."
+                return
+            }
+            await addManualGame(title: Self.title(forExecutable: url), executable: url, bottleID: nil)
+            return
+        }
+        if LibraryScanner.looksLikeSingleGame(url) {
+            guard let exe = LibraryScanner.findWindowsExecutable(in: url, hint: nil) else {
+                statusMessage = "No Windows .exe found in \(url.lastPathComponent)."
+                return
+            }
+            await addManualGame(title: url.lastPathComponent, executable: exe, bottleID: nil)
+            return
+        }
+        guard !gameFolders.contains(url) else {
+            statusMessage = "\(url.lastPathComponent) is already in your library folders."
+            return
+        }
+        gameFolders.append(url)
+        AetherPreferences.gameFolders = gameFolders
+        let before = games.count
+        await refresh()
+        statusMessage = "Added \(url.lastPathComponent): \(max(games.count - before, 0)) game(s) found. Click a cover to play."
+    }
+
+    public func removeGameFolder(_ url: URL) async {
+        gameFolders.removeAll { $0 == url }
+        AetherPreferences.gameFolders = gameFolders
+        await refresh()
+    }
+
+    /// "…/Cyberpunk 2077/bin/x64/Cyberpunk2077.exe" → "Cyberpunk 2077".
+    static func title(forExecutable exe: URL) -> String {
+        var folder = exe.deletingLastPathComponent()
+        let generic: Set<String> = ["bin", "binaries", "win64", "x64", "x86", "win32", "game", "retail"]
+        while generic.contains(folder.lastPathComponent.lowercased()), folder.pathComponents.count > 2 {
+            folder = folder.deletingLastPathComponent()
+        }
+        let name = folder.lastPathComponent
+        return name.isEmpty || name == "/" ? exe.deletingPathExtension().lastPathComponent : name
     }
 
     // MARK: - Automatic setup on Play
@@ -572,8 +628,14 @@ public final class LibraryViewModel {
 
     /// Adds a game installed inside a bottle to the library; it will always run in that bottle.
     public func addManualGame(title: String, executable: URL, bottle: BottleInfo) async {
+        await addManualGame(title: title, executable: executable, bottleID: bottle.id)
+    }
+
+    /// `bottleID == nil`: the game gets its own bottle, created automatically on first play.
+    public func addManualGame(title: String, executable: URL, bottleID: String?) async {
         do {
-            try ManualGameStore.add(ManualGame(title: title, executable: executable, bottle: bottle.id))
+            let bottle = bottleID ?? RuntimeInstaller.slugify(title)
+            try ManualGameStore.add(ManualGame(title: title, executable: executable, bottle: bottle))
             statusMessage = "Added \(title) to your library."
             await refresh()
         } catch {

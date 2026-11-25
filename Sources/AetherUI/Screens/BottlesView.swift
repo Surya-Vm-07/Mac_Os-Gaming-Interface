@@ -29,7 +29,7 @@ struct BottlesView: View {
                         .font(.system(size: 40, weight: .heavy))
                         .tracking(-1.1)
                         .foregroundStyle(.white)
-                    Text("Each bottle is an isolated Windows (Wine prefix). Games get their own automatically. To install a game from setup.exe: Run Installer, then Add Game.")
+                    Text("You usually don't need this page: every game gets its own bottle automatically when you click Play. Use it for games that come as a setup.exe: create a bottle → Run Installer → Add Game.")
                         .font(.system(size: 13.5, weight: .medium))
                         .foregroundStyle(.white.opacity(0.6))
                         .fixedSize(horizontal: false, vertical: true)
@@ -49,6 +49,8 @@ struct BottlesView: View {
                     Spacer()
                     GhostButton(title: "Refresh", systemImage: "arrow.clockwise") { reload() }
                 }
+
+                GameFoldersPanel(library: library)
 
                 if bottles.isEmpty {
                     Text("No bottles yet. They're created the first time you play a Windows game, or create one above to run an installer.")
@@ -234,5 +236,54 @@ private struct SmallAction: View {
         .buttonStyle(.plain)
         .opacity(isEnabled ? 1 : 0.4)
         .onHover { isHovered = $0 }
+    }
+}
+
+/// Folders and drives scanned for Windows games (managed here; added from Home → Add Games).
+private struct GameFoldersPanel: View {
+    let library: LibraryViewModel
+
+    var body: some View {
+        Panel(title: "GAME FOLDERS") {
+            FolderLine(url: URL.documentsDirectory.appending(path: "Aether Games", directoryHint: .isDirectory), removable: false, library: library)
+            ForEach(library.gameFolders, id: \.self) { folder in
+                FolderLine(url: folder, removable: true, library: library)
+            }
+            AddGamesButton(library: library)
+        }
+    }
+}
+
+private struct FolderLine: View {
+    let url: URL
+    let removable: Bool
+    let library: LibraryViewModel
+
+    var body: some View {
+        let online = FileManager.default.fileExists(atPath: url.path(percentEncoded: false))
+        HStack(spacing: 10) {
+            Image(systemName: url.path(percentEncoded: false).hasPrefix("/Volumes/") ? "externaldrive.fill" : "folder.fill")
+                .foregroundStyle(AetherTheme.cyan)
+            Text(url.path(percentEncoded: false))
+                .font(AetherTheme.mono(12))
+                .foregroundStyle(.white.opacity(0.85))
+                .lineLimit(1)
+                .truncationMode(.middle)
+            if !online {
+                Text("NOT CONNECTED")
+                    .font(AetherTheme.mono(9.5, weight: .bold))
+                    .foregroundStyle(AetherTheme.amber)
+            }
+            Spacer()
+            if removable {
+                Button {
+                    Task { await library.removeGameFolder(url) }
+                } label: {
+                    Image(systemName: "minus.circle.fill").foregroundStyle(.white.opacity(0.5))
+                }
+                .buttonStyle(.plain)
+                .help("Stop scanning this folder (files are not touched)")
+            }
+        }
     }
 }

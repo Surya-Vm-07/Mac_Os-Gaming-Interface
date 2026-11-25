@@ -1,3 +1,4 @@
+import AppKit
 import AetherCore
 import SwiftUI
 
@@ -314,5 +315,33 @@ struct StreamExitBar: View {
             .frame(maxWidth: .infinity, alignment: .leading)
             Spacer()
         }
+    }
+}
+
+/// One picker for everything: a Windows .exe, one game's folder, or a whole folder / SSD of games.
+@MainActor
+enum GamePicker {
+    static func chooseGamesLocation() -> URL? {
+        let panel = NSOpenPanel()
+        panel.canChooseFiles = true
+        panel.canChooseDirectories = true
+        panel.allowsMultipleSelection = false
+        panel.directoryURL = URL(filePath: "/Volumes", directoryHint: .isDirectory)
+        panel.message = "Choose a folder of Windows games (e.g. on your SSD), one game's folder, or a game's .exe."
+        panel.prompt = "Add"
+        return panel.runModal() == .OK ? panel.url : nil
+    }
+}
+
+/// "+ Add Games" button: opens the picker and hands the result to the library.
+struct AddGamesButton: View {
+    let library: LibraryViewModel
+
+    var body: some View {
+        GhostButton(title: "Add Games", systemImage: "plus") {
+            guard let url = GamePicker.chooseGamesLocation() else { return }
+            Task { await library.addGames(at: url) }
+        }
+        .help("Add a folder or SSD of Windows games, one game's folder, or a single .exe")
     }
 }

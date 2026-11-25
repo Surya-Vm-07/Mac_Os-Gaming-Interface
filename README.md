@@ -23,7 +23,8 @@ and needs no servers.
 | 5a | Native Engine Setup page in Swift; unified cool palette, no glows; real native-launch errors | **Implemented, awaiting macOS build** |
 | 5b | Way back to Home from every screen (stream exit bar, Back to Library, drawer row, ‹ Home); Bottles page: run installers, add installed games, stop, delete | **Implemented, awaiting macOS build** |
 | 5c | One-click play from banner, covers and tiles; Play auto-installs Rosetta/Wine/DXMT/DXVK and falls back from D3DMetal; launch spinners | **Implemented, awaiting macOS build** |
-| 5d | Delete `launcher/`, licensing, Settings | Next |
+| 5d | Add Games (folder / SSD / single game / .exe), Game Folders list, Steam-less Mac game launch | **Implemented, awaiting macOS build** |
+| 5e | Delete `launcher/`, licensing, Settings | Next |
 
 ## Requirements
 
@@ -54,9 +55,18 @@ features are ported here. Both share `~/Library/Application Support/Aether Launc
 1. Open **Engine Setup** in the sidebar (⌘3) and install Rosetta, Wine Staging, DXMT, DXVK and
    optionally D3DMetal (from your own free Game Porting Toolkit download). Runtimes the Tauri
    wizard already installed are picked up as they are.
-2. Drop a Windows game folder (or a single `.exe`) into `~/Documents/Aether Games`.
-3. In Aether, open the game, pick a **Performance Preset**, and press Play. The first launch creates
-   the game's bottle (20–60 s).
+2. On Home, click **Add Games** and pick any of:
+   - a folder or SSD full of Windows games (e.g. `/Volumes/SSD/Games`): every game inside becomes a
+     cover, rescanned each launch (shows "not connected" while the drive is unplugged);
+   - one game's folder (e.g. `/Volumes/SSD/Cyberpunk 2077`): added as that single game;
+   - a single `.exe`.
+3. Click the cover. That's it: missing pieces (Rosetta, Wine, DXMT) install once, the game's
+   bottle is created (first launch, 20–60 s), and it starts. Change the **Performance Preset** on
+   the game page (ⓘ) if a game runs badly.
+
+Drive formats: APFS / exFAT work. NTFS drives are read-only on macOS, so games that write saves or
+settings next to the .exe can fail from them; copy those games to APFS / exFAT.
+Games installed with a `setup.exe`: Bottles (⌘4) → create a bottle → Run Installer → Add Game.
 
 ## Run the shell (Phase 2)
 

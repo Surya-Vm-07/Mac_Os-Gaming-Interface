@@ -192,3 +192,27 @@ struct GridNavigatorTests {
         #expect(GridNavigator.move(from: 99, .up, count: 4, columns: 0) == 2)
     }
 }
+
+@Suite("Add Games detection")
+struct AddGamesDetectionTests {
+    @Test("A game's own folder is one game; a folder of games is a library folder")
+    func singleGameVersusLibrary() throws {
+        let lib = try FakeLibrary()
+        defer { lib.cleanUp() }
+        // A drive/folder holding several games.
+        try lib.file("SSD/Games/Hades/Hades.exe", bytes: 10)
+        try lib.file("SSD/Games/Celeste/Celeste.exe", bytes: 10)
+        // One Unreal-style game picked directly.
+        try lib.file("SSD/Games/Cyberpunk 2077/bin/x64/Cyberpunk2077.exe", bytes: 10)
+        try lib.file("SSD/Games/Cyberpunk 2077/engine/config.ini", "x")
+        try lib.file("SSD/Games/Cyberpunk 2077/archive/pc.archive", "x")
+
+        #expect(!LibraryScanner.looksLikeSingleGame(lib.url("SSD/Games")))
+        #expect(LibraryScanner.looksLikeSingleGame(lib.url("SSD/Games/Hades")))
+        #expect(LibraryScanner.looksLikeSingleGame(lib.url("SSD/Games/Cyberpunk 2077")))
+        #expect(LibraryScanner.findWindowsExecutable(in: lib.url("SSD/Games/Cyberpunk 2077"), hint: nil)?.lastPathComponent == "Cyberpunk2077.exe")
+
+        let scanned = LibraryScanner(configuration: .init(steamRoots: [], applicationDirectories: [], customDirectories: [lib.url("SSD/Games")]))
+        #expect(scanned.scan().games.map(\.title) == ["Celeste", "Cyberpunk 2077", "Hades"])
+    }
+}

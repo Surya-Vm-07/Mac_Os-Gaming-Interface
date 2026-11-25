@@ -26,6 +26,9 @@ struct LibraryHomeView: View {
                             SectionLabel(text: "\(library.filter.title.uppercased()) · \(library.visibleGames.count)")
                             if library.visibleGames.isEmpty {
                                 EmptyLibraryNote(filter: library.filter)
+                                if library.filter == .all || library.filter == .windows {
+                                    AddGamesButton(library: library)
+                                }
                             } else {
                                 CoverGrid(shell: shell)
                             }
@@ -166,9 +169,11 @@ private struct FeaturedHero: View {
                     }
                     .padding(.top, 6)
                 } else {
-                    Text("Drop Windows games into ~/Documents/Aether Games, install Mac games, or open Cloud Gaming.")
+                    Text("Add your Windows games (a folder, an SSD, or one .exe). Then click a cover to play.")
                         .font(.system(size: 15, weight: .medium))
                         .foregroundStyle(.white.opacity(0.7))
+                    AddGamesButton(library: library)
+                        .padding(.top, 6)
                 }
             }
             .padding(.horizontal, AetherTheme.pageMargin)
@@ -199,6 +204,7 @@ private struct FilterBar: View {
                 }
             }
             Spacer(minLength: 12)
+            AddGamesButton(library: library)
             ControlHint(key: "Ⓐ ⏎", label: "Play")
             ControlHint(key: "Ⓧ ⇧⏎", label: "Details")
             ControlHint(key: "LB RB  [ ]", label: "Switch")
@@ -354,8 +360,10 @@ private struct EmptyLibraryNote: View {
 
     var body: some View {
         Text(filter == .all
-             ? "No games yet. Drop Windows games into ~/Documents/Aether Games, or press ⌘R to rescan."
-             : "No \(filter.title.lowercased()) games.")
+             ? "No games yet. Click Add Games and choose your SSD or games folder. Each game becomes a cover you click to play."
+             : filter == .windows
+                ? "No Windows games yet. Add Games → pick the folder (or SSD) that holds them."
+                : "No \(filter.title.lowercased()) games.")
             .font(.system(size: 14, weight: .medium))
             .foregroundStyle(.white.opacity(0.55))
             .padding(.vertical, 30)

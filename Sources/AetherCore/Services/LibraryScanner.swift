@@ -333,6 +333,18 @@ public struct LibraryScanner: Sendable {
 
     // MARK: - Install detection
 
+    /// True when `folder` is one game's install folder rather than a folder of games: it has an
+    /// .exe at the top, or the classic engine layout (bin / Binaries / Engine / x64 …).
+    public static func looksLikeSingleGame(_ folder: URL) -> Bool {
+        let entries = (try? FileManager.default.contentsOfDirectory(
+            at: folder, includingPropertiesForKeys: [.isDirectoryKey], options: [.skipsHiddenFiles]
+        )) ?? []
+        if entries.contains(where: { $0.pathExtension.lowercased() == "exe" }) { return true }
+        let markers: Set<String> = ["bin", "binaries", "engine", "x64", "win64", "_commonredist", "data", "content"]
+        let names = Set(entries.map { $0.lastPathComponent.lowercased() })
+        return names.intersection(markers).count >= 2
+    }
+
     static func detectInstallation(in directory: URL, executableHint: String?) -> GameInstallation {
         GameInstallation(
             nativeApplication: findApplicationBundle(in: directory, depth: 2),
@@ -358,7 +370,7 @@ public struct LibraryScanner: Sendable {
     /// Uses the profile's `executable` hint if it exists. Otherwise picks the largest `.exe` within
     /// `maxExecutableDepth` levels that is not an installer, redistributable, crash reporter or anti-cheat service.
     /// The game binary is almost always the biggest one.
-    static func findWindowsExecutable(in directory: URL, hint: String?) -> URL? {
+    public static func findWindowsExecutable(in directory: URL, hint: String?) -> URL? {
         let fm = FileManager.default
         if let hint {
             let hinted = directory.appending(path: hint)
