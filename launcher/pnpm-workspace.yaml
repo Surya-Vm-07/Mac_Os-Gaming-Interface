@@ -1,0 +1,3 @@
+# Supply-chain safety: never resolve a package version younger than 24 hours.
+# Matches pnpm 12's default, so lockfiles generated anywhere pass verification everywhere.
+minimumReleaseAge: 1440
