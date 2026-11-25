@@ -121,6 +121,13 @@ public enum MacHardwareProfiler {
 
     /// GPU core count from the Apple GPU's IORegistry entry (`AGXAccelerator` class).
     static func gpuCoreCount() -> Int? {
+        guard let cores = (agxRegistryValue("gpu-core-count") as? NSNumber)?.intValue, cores > 0 else { return nil }
+        return cores
+    }
+
+    /// First value for `key` across `AGXAccelerator` services (the Apple GPU driver).
+    /// Also used by `SystemTelemetry` to read `PerformanceStatistics`.
+    static func agxRegistryValue(_ key: String) -> AnyObject? {
         var iterator: io_iterator_t = 0
         guard IOServiceGetMatchingServices(
             kIOMainPortDefault,
@@ -131,17 +138,10 @@ public enum MacHardwareProfiler {
 
         var service = IOIteratorNext(iterator)
         while service != 0 {
-            let property = IORegistryEntryCreateCFProperty(
-                service,
-                "gpu-core-count" as CFString,
-                kCFAllocatorDefault,
-                0
-            )?.takeRetainedValue()
+            let value = IORegistryEntryCreateCFProperty(service, key as CFString, kCFAllocatorDefault, 0)?
+                .takeRetainedValue()
             IOObjectRelease(service)
-
-            if let cores = (property as? NSNumber)?.intValue, cores > 0 {
-                return cores
-            }
+            if let value { return value }
             service = IOIteratorNext(iterator)
         }
         return nil

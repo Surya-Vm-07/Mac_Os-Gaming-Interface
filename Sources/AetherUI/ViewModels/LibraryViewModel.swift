@@ -14,7 +14,10 @@ public final class LibraryViewModel {
     public private(set) var artwork: [GameItem.ID: [ArtworkKind: URL]] = [:]
     public private(set) var focusedIndex = 0
     public private(set) var isScanning = false
+    /// Title of a Wine session Aether is supervising (the UI suspends while it runs).
     public private(set) var runningGameTitle: String?
+    /// Last native game Aether launched. Kept so the drawer can force-quit it.
+    public private(set) var nativeSession: (title: String, app: URL)?
     public private(set) var statusMessage: String?
     /// Set by the grid from the window width.
     public var columns = 5
@@ -65,6 +68,11 @@ public final class LibraryViewModel {
     }
 
     public var isGameRunning: Bool { runningGameTitle != nil }
+
+    /// Title shown in the Quick Drawer's session header.
+    public var activeSessionTitle: String? { runningGameTitle ?? nativeSession?.title }
+
+    public var canForceQuit: Bool { runningGameTitle != nil || nativeSession != nil }
 
     public var hardwareSummary: String {
         "\(hardware.chip?.description ?? hardware.chipName) · \(hardware.totalMemoryGB) GB · TIER \(hardware.tier.rawValue)"
@@ -140,9 +148,23 @@ public final class LibraryViewModel {
         }
     }
 
-    /// Kills the running Wine bottle (Quick Drawer → Force Quit in Phase 3).
+    /// Quick Drawer → Force Quit. Wine sessions: SIGTERM → `wineserver -k` → SIGKILL.
+    /// Native games: polite terminate, then force-terminate after 3 s.
     public func forceQuitActiveGame() async {
-        await bottleEngine?.terminate()
+        if runningGameTitle != nil {
+            await bottleEngine?.terminate()
+            return
+        }
+        guard let session = nativeSession else { return }
+        let target = session.app.standardizedFileURL
+        let running = NSWorkspace.shared.runningApplications.filter { $0.bundleURL?.standardizedFileURL == target }
+        running.forEach { $0.terminate() }
+        try? await Task.sleep(for: .seconds(3))
+        for app in running where !app.isTerminated {
+            app.forceTerminate()
+        }
+        nativeSession = nil
+        statusMessage = "\(session.title) closed."
     }
 
     private func route(_ game: GameItem, preference: RoutingPreference = .automatic) -> RoutingDecision? {
@@ -164,6 +186,9 @@ public final class LibraryViewModel {
         }
         // We cannot see when a native game exits, so do not lock the UI. Just free the textures.
         ImagePipeline.shared.purge()
+        if let app = game.installation.nativeApplication {
+            nativeSession = (game.title, app)
+        }
         statusMessage = "Launching \(game.title)…"
     }
 
@@ -185,7 +210,7 @@ public final class LibraryViewModel {
                 executable: executable,
                 bottle: AetherPaths.bottle(for: game.bottleName),
                 translation: translation,
-                metalHUDEnabled: true
+                metalHUDEnabled: AetherPreferences.metalHUDEnabled
             ))
             runningGameTitle = game.title
             statusMessage = nil

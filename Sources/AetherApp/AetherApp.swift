@@ -18,14 +18,22 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 @main
 struct AetherApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
-    @State private var library = LibraryViewModel.makeDefault()
+    @State private var shell = ShellCoordinator.makeDefault()
 
     var body: some Scene {
         WindowGroup("Aether") {
-            LibraryHomeView(model: library)
+            RootView(shell: shell)
                 .frame(minWidth: 1100, minHeight: 720)
         }
         .windowStyle(.hiddenTitleBar)
         .defaultSize(width: 1440, height: 900)
+        .commands {
+            CommandMenu("Aether") {
+                Button("Quick Access Drawer") { shell.toggleDrawer() }
+                    .keyboardShortcut("g", modifiers: [.command, .shift])
+                Button("Rescan Library") { Task { await shell.library.refresh() } }
+                    .keyboardShortcut("r", modifiers: [.command])
+            }
+        }
     }
 }

@@ -11,8 +11,8 @@ A native, controller-first gaming orchestrator for Apple Silicon Macs. It routes
 | Phase | Scope | State |
 | --- | --- | --- |
 | 1 | Hardware profiler, models, router, manifest loader, BottleEngine, CLI | Done (builds and tests green on macOS) |
-| 2 | SwiftUI shell, library scanner, artwork | **Implemented, awaiting macOS build** |
-| 3 | GCController focus engine, Quick Overlay Drawer | Not started |
+| 2 | SwiftUI shell, library scanner, artwork | Implemented (user-confirmed) |
+| 3 | GCController focus engine, Quick Overlay Drawer | **Implemented, awaiting macOS build** |
 | 4 | Streaming engine | Not started |
 
 ## Requirements
@@ -42,8 +42,20 @@ They are skipped automatically when Rosetta 2 is not installed.
 swift run AetherApp
 ```
 
-Keys: arrows move, Return/Space plays, Shift+Return plays locally (low-spec override), R rescans,
-Esc dismisses messages. Controller support lands in Phase 3 on the same view-model API.
+| Action | Controller | Keyboard |
+| --- | --- | --- |
+| Move focus | D-pad / left stick | Arrow keys |
+| Play | Ⓐ / Cross | Return, Space |
+| Play locally anyway (low-spec override) | Ⓧ / Square | Shift+Return |
+| Rescan library | Ⓨ / Triangle | R, ⌘R |
+| Back / dismiss | Ⓑ / Circle | Esc |
+| Quick Access drawer | Home / Guide / PS, or Menu | ⇧⌘G |
+
+The Quick Access drawer shows live CPU, GPU, RAM, swap, memory pressure and thermals (sampled
+only while it is open). It also toggles the Metal HUD (applies to the next Wine launch), switches
+the audio output, and force-quits the active game. The Home button works while a game is in front:
+Aether comes forward with the drawer, and "Return to Game" hands focus back. While another app is
+frontmost, Aether ignores every controller input except Home.
 
 To launch Windows games from the UI before the Settings screen exists:
 

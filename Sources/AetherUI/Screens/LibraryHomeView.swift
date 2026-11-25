@@ -5,11 +5,9 @@ import SwiftUI
 
 /// Console-style home: crossfading hero backdrop, glass header for the focused game, cover grid.
 ///
-/// Input (Phase 2): arrow keys move focus, Return/Space plays, Shift+Return plays locally
-/// anyway, R rescans. Phase 3 calls the same view-model methods from GCController.
+/// Input is routed by `RootView` / `ShellCoordinator`. Keyboard and controller share one path.
 public struct LibraryHomeView: View {
     let model: LibraryViewModel
-    @FocusState private var hasKeyboardFocus: Bool
 
     public init(model: LibraryViewModel) {
         self.model = model
@@ -43,24 +41,6 @@ public struct LibraryHomeView: View {
             StatusToast(message: model.statusMessage)
         }
         .preferredColorScheme(.dark)
-        .focusable()
-        .focusEffectDisabled()
-        .focused($hasKeyboardFocus)
-        .onAppear { hasKeyboardFocus = true }
-        .onKeyPress(.leftArrow) { model.moveFocus(.left); return .handled }
-        .onKeyPress(.rightArrow) { model.moveFocus(.right); return .handled }
-        .onKeyPress(.upArrow) { model.moveFocus(.up); return .handled }
-        .onKeyPress(.downArrow) { model.moveFocus(.down); return .handled }
-        .onKeyPress(keys: [.return, .space]) { press in
-            let preference: RoutingPreference = press.modifiers.contains(.shift) ? .preferLocal : .automatic
-            Task { await model.playFocused(preference: preference) }
-            return .handled
-        }
-        .onKeyPress(.escape) { model.dismissStatus(); return .handled }
-        .onKeyPress(characters: CharacterSet(charactersIn: "rR")) { _ in
-            Task { await model.refresh() }
-            return .handled
-        }
         .task(id: model.focusedGame?.id) {
             if let game = model.focusedGame {
                 await model.loadArtwork(for: game, kinds: [.hero])
@@ -196,12 +176,12 @@ private struct HeroHeader: View {
             }
 
             HStack(spacing: 20) {
-                ControlHint(key: "⏎", label: "Play")
+                ControlHint(key: "Ⓐ ⏎", label: "Play")
                 if decision?.allowLocalOverride == true {
-                    ControlHint(key: "⇧⏎", label: "Play locally")
+                    ControlHint(key: "Ⓧ ⇧⏎", label: "Play locally")
                 }
-                ControlHint(key: "←↑↓→", label: "Navigate")
-                ControlHint(key: "R", label: "Rescan")
+                ControlHint(key: "Ⓨ R", label: "Rescan")
+                ControlHint(key: "⌂ ⇧⌘G", label: "Quick Access")
             }
             .padding(.top, 4)
         }
