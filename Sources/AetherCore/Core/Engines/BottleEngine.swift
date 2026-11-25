@@ -16,7 +16,7 @@ public enum BottleEngineError: Error, Equatable, CustomStringConvertible {
     public var description: String {
         switch self {
         case .sessionAlreadyActive(let pid): "A bottle session is already running (pid \(pid))."
-        case .unsupportedBackend(let b): "Backend '\(b.rawValue)' is not supported yet (Phase 1: d3dmetal only)."
+        case .unsupportedBackend(let b): "The GPTK script path only runs D3DMetal; \(b.label) needs an installed Wine runtime."
         case .executableNotFound(let p): "Game executable not found: \(p)"
         case .wineBinaryNotFound(let p): "Wine binary missing or not executable: \(p)"
         case .wineserverNotFound(let p): "wineserver missing or not executable: \(p)"
@@ -241,6 +241,9 @@ public actor BottleEngine {
         runtime: BottleRuntime,
         baseEnvironment: [String: String] = ProcessInfo.processInfo.environment
     ) -> LaunchCommand {
+        if runtime.mode == .direct {
+            return makeDirectLaunchCommand(for: request, runtime: runtime, baseEnvironment: baseEnvironment)
+        }
         var environment = baseEnvironment.filter { !$0.key.hasPrefix("DYLD_") }
         for (key, value) in request.translation.envVars where !key.hasPrefix("DYLD_") {
             environment[key] = value
@@ -270,8 +273,41 @@ public actor BottleEngine {
         )
     }
 
+    /// `wine <exe> <args…>` with the full environment from `WineEnvironment.build`.
+    /// The preset sits below profile vars, the HUD toggle and user overrides; WINEPREFIX is pinned last.
+    static func makeDirectLaunchCommand(
+        for request: BottleLaunchRequest,
+        runtime: BottleRuntime,
+        baseEnvironment: [String: String]
+    ) -> LaunchCommand {
+        var environment = baseEnvironment.filter { !$0.key.hasPrefix("DYLD_") }
+        let wine = WineEnvironment.build(
+            prefix: request.bottle,
+            preset: request.preset,
+            backend: request.translation.backend,
+            metalHUD: request.metalHUDEnabled,
+            dxmtConfig: request.dxmtConfig,
+            profileEnvironment: request.translation.envVars,
+            userOverrides: request.additionalEnvironment
+        )
+        environment.merge(wine) { _, new in new }
+
+        return LaunchCommand(
+            executableURL: runtime.wineBinary,
+            arguments: [request.executable.path(percentEncoded: false)]
+                + request.translation.launchArgs
+                + request.additionalArguments,
+            environment: environment,
+            workingDirectory: request.executable.deletingLastPathComponent()
+        )
+    }
+
     /// Fails fast in Swift with typed errors, before anything is spawned.
     static func validate(_ request: BottleLaunchRequest, runtime: BottleRuntime) throws {
+        if runtime.mode == .direct {
+            try validateDirect(request, runtime: runtime)
+            return
+        }
         guard request.translation.backend == .d3dmetal else {
             throw BottleEngineError.unsupportedBackend(request.translation.backend)
         }
@@ -293,6 +329,16 @@ public actor BottleEngine {
 
         let script = runtime.launcherScript.path(percentEncoded: false)
         guard fm.fileExists(atPath: script) else { throw BottleEngineError.launcherScriptNotFound(script) }
+    }
+
+    private static func validateDirect(_ request: BottleLaunchRequest, runtime: BottleRuntime) throws {
+        let fm = FileManager.default
+        let exe = request.executable.path(percentEncoded: false)
+        guard fm.fileExists(atPath: exe) else { throw BottleEngineError.executableNotFound(exe) }
+        let wine = runtime.wineBinary.path(percentEncoded: false)
+        guard fm.isExecutableFile(atPath: wine) else { throw BottleEngineError.wineBinaryNotFound(wine) }
+        let wineserver = runtime.wineserverBinary.path(percentEncoded: false)
+        guard fm.isExecutableFile(atPath: wineserver) else { throw BottleEngineError.wineserverNotFound(wineserver) }
     }
 
     private static func ensureBottleExists(at bottle: URL) throws {

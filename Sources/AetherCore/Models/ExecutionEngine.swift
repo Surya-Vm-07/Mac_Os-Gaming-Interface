@@ -41,10 +41,37 @@ public enum ExecutionEngine: String, Codable, Sendable, CaseIterable {
     // encode(to:) is synthesized from RawRepresentable and writes "native" / "local" / "cloud".
 }
 
-/// Windows-graphics translation backend used inside a Wine bottle.
-public enum TranslationBackend: String, Codable, Sendable, CaseIterable {
-    /// Apple Game Porting Toolkit D3D11/D3D12 -> Metal.
+/// DirectX → Metal translation path inside a Wine bottle.
+public enum TranslationBackend: String, Codable, Sendable, CaseIterable, Identifiable {
+    /// Apple Game Porting Toolkit: D3D11/D3D12 → Metal. Best for DX12 AAA.
     case d3dmetal
-    /// DXVK (D3D -> Vulkan) over MoltenVK (Vulkan -> Metal). Not implemented in Phase 1.
+    /// DXMT: open-source D3D10/D3D11 → Metal. Often the fastest DX11 path.
+    case dxmt
+    /// DXVK (macOS build): D3D9–11 → Vulkan → MoltenVK → Metal.
     case dxvk
+    /// Wine's built-in WineD3D (→ OpenGL). Slowest, most compatible.
+    case wined3d
+
+    public var id: String { rawValue }
+
+    public var label: String {
+        switch self {
+        case .d3dmetal: "D3DMetal"
+        case .dxmt: "DXMT"
+        case .dxvk: "DXVK"
+        case .wined3d: "WineD3D"
+        }
+    }
+
+    /// `WINEDLLOVERRIDES` for this backend. DXVK installs **native** DLLs into the bottle (`n,b`).
+    /// D3DMetal / DXMT live in their own runtime as **builtins** (`b`); the explicit `b` also beats
+    /// DXVK DLLs left in the bottle from an earlier backend switch.
+    public var dllOverrides: String {
+        switch self {
+        case .dxvk: "d3d9,d3d10core,d3d11,dxgi=n,b"
+        case .dxmt: "d3d10core,d3d11,dxgi=b"
+        case .d3dmetal: "d3d10core,d3d11,d3d12,dxgi=b"
+        case .wined3d: "d3d9,d3d10core,d3d11,dxgi=b"
+        }
+    }
 }

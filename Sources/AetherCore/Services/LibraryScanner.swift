@@ -34,7 +34,9 @@ public struct LibraryScanner: Sendable {
                 applicationDirectories: [
                     URL(filePath: "/Applications", directoryHint: .isDirectory),
                     URL.homeDirectory.appending(path: "Applications", directoryHint: .isDirectory),
-                ]
+                ],
+                // Drop Windows game folders or .exe files here; each one becomes a library entry.
+                customDirectories: [URL.documentsDirectory.appending(path: "Aether Games", directoryHint: .isDirectory)]
             )
         }
     }

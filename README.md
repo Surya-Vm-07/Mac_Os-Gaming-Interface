@@ -19,7 +19,8 @@ and needs no servers.
 | 2 | SwiftUI shell, library scanner, artwork | Implemented (user-confirmed) |
 | 3 | GCController focus engine, Quick Overlay Drawer | Done (builds and runs on macOS) |
 | 4 | Launcher redesign (sidebar, game page), Cloud hub + in-app streaming | **Implemented, awaiting macOS build** |
-| 5 | Licensing (paid app), onboarding, Settings, Discover/free games | Planned |
+| 4b | Local Windows games via setup-wizard runtimes: per-game presets (Max FPS, DX12 AAA, DX11 DXMT, Compatibility), auto bottles, DXVK sync | **Implemented, awaiting macOS build** |
+| 5 | Native setup wizard + bottle manager in Swift (replaces `launcher/`), licensing, Settings | Next |
 
 ## Requirements
 
@@ -41,6 +42,17 @@ swift test
 
 Two `BottleEngine` tests spawn real processes, using fake `wine64` / `wineserver` shell scripts.
 They are skipped automatically when Rosetta 2 is not installed.
+
+## Windows games (local, $0)
+
+**Swift is the app.** `launcher/` (Tauri) is a temporary reference and setup wizard, until its
+features are ported here. Both share `~/Library/Application Support/Aether Launcher`:
+
+1. Run the wizard once (`cd launcher && pnpm tauri dev`) to install Wine Staging, DXMT, DXVK and
+   optionally D3DMetal. The Swift app picks these runtimes up automatically.
+2. Drop a Windows game folder (or a single `.exe`) into `~/Documents/Aether Games`.
+3. In Aether, open the game, pick a **Performance Preset**, and press Play. The first launch creates
+   the game's bottle (20–60 s).
 
 ## Run the shell (Phase 2)
 

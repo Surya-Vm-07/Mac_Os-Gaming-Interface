@@ -38,6 +38,11 @@ struct GameDetailView: View {
                 }
                 .padding(.horizontal, 40)
 
+                if game.installation.windowsExecutable != nil {
+                    presetPicker
+                        .padding(.horizontal, 40)
+                }
+
                 stats
                     .padding(.horizontal, 40)
                     .padding(.bottom, 40)
@@ -77,6 +82,45 @@ struct GameDetailView: View {
         }
         .frame(height: 360)
         .clipped()
+    }
+
+    // MARK: Preset
+
+    /// Per-game performance preset (Windows games). Presets whose graphics stack is not installed
+    /// stay listed but are marked, so the user sees what the setup wizard would unlock.
+    private var presetPicker: some View {
+        let current = library.preset(for: game)
+        let selection = Binding<PerformancePreset>(
+            get: { library.preset(for: game) },
+            set: { library.setPreset($0, for: game) }
+        )
+        return VStack(alignment: .leading, spacing: 10) {
+            HStack(spacing: 14) {
+                SectionLabel(text: "PERFORMANCE PRESET")
+                Picker("Preset", selection: selection) {
+                    ForEach(PerformancePreset.allCases) { preset in
+                        Text(library.isAvailable(preset, for: game) ? preset.displayName : "\(preset.displayName) (not installed)")
+                            .tag(preset)
+                    }
+                }
+                .pickerStyle(.menu)
+                .labelsHidden()
+                .frame(width: 260)
+                if let base = library.wineBase {
+                    Text("\(base.name) \(base.version)")
+                        .font(AetherTheme.mono(11))
+                        .foregroundStyle(.white.opacity(0.45))
+                }
+            }
+            Text(current.summary)
+                .font(AetherTheme.mono(11))
+                .foregroundStyle(.white.opacity(0.6))
+            if !library.isAvailable(current, for: game) {
+                Text("This preset's graphics stack isn't installed. Open the setup wizard, or pick another preset.")
+                    .font(AetherTheme.mono(11, weight: .bold))
+                    .foregroundStyle(AetherTheme.amber)
+            }
+        }
     }
 
     // MARK: Stats

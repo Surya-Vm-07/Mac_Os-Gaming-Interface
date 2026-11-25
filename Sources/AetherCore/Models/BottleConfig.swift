@@ -22,6 +22,12 @@ public enum AetherPaths {
         URL.cachesDirectory.appending(path: "Aether/Artwork", directoryHint: .isDirectory)
     }
 
+    /// Shared engine data, also used by the setup wizard: Wine runtimes (`runtimes/`) and
+    /// graphics components (`components/`) live in `~/Library/Application Support/Aether Launcher`.
+    public static var engineRoot: URL {
+        URL.applicationSupportDirectory.appending(path: "Aether Launcher", directoryHint: .isDirectory)
+    }
+
     /// `~/Library/Application Support/Aether/play_history.json`
     public static var playHistory: URL {
         applicationSupport.appending(path: "play_history.json")
@@ -32,7 +38,16 @@ public enum AetherPaths {
     }
 }
 
-/// Where the Wine + GPTK toolchain lives on this Mac. Set once in Settings.
+/// How `BottleEngine` starts Wine.
+public enum LaunchMode: Sendable, Equatable {
+    /// Phase 1 path: `launch_d3dmetal.sh` with an external GPTK Wine and a D3DMetal library folder.
+    case gptkScript
+    /// Self-contained runtime from `WineRuntimeStore`: exec `wine` directly. The Gcenx build is a
+    /// plain x86_64 binary, so macOS runs it under Rosetta itself, with no `arch` or `DYLD_*` needed.
+    case direct
+}
+
+/// Where the Wine toolchain lives on this Mac.
 public struct BottleRuntime: Sendable, Equatable {
     /// GPTK-compatible Wine loader (x86_64), e.g. `.../bin/wine64`.
     public var wineBinary: URL
@@ -42,19 +57,32 @@ public struct BottleRuntime: Sendable, Equatable {
     public var d3dMetalLibraryDirectory: URL
     /// The `launch_d3dmetal.sh` bootstrapper. Defaults to the copy bundled in AetherCore.
     public var launcherScript: URL
+    public var mode: LaunchMode
 
     public init(
         wineBinary: URL,
         wineserverBinary: URL? = nil,
         d3dMetalLibraryDirectory: URL,
-        launcherScript: URL = BottleRuntime.bundledLauncherScript
+        launcherScript: URL = BottleRuntime.bundledLauncherScript,
+        mode: LaunchMode = .gptkScript
     ) {
+        self.mode = mode
         self.wineBinary = wineBinary
         // GPTK / CrossOver-style builds put wineserver next to the wine loader.
         self.wineserverBinary = wineserverBinary
             ?? wineBinary.deletingLastPathComponent().appending(path: "wineserver")
         self.d3dMetalLibraryDirectory = d3dMetalLibraryDirectory
         self.launcherScript = launcherScript
+    }
+
+    /// Direct launches through an installed runtime (base, `+d3dmetal` or `+dxmt`).
+    public init(runtime: WineRuntime) {
+        self.init(
+            wineBinary: runtime.wineBinary,
+            wineserverBinary: runtime.wineserver,
+            d3dMetalLibraryDirectory: runtime.libDirectory.appending(path: "external", directoryHint: .isDirectory),
+            mode: .direct
+        )
     }
 
     /// Development hook until the Settings screen exists: reads `AETHER_WINE`, `AETHER_D3DMETAL`
@@ -89,6 +117,10 @@ public struct BottleLaunchRequest: Sendable, Equatable {
     public var metalHUDEnabled: Bool
     public var additionalArguments: [String]
     public var additionalEnvironment: [String: String]
+    /// Direct mode only: preset env vars (`.custom` = none).
+    public var preset: PerformancePreset
+    /// Direct mode only: passed through as `DXMT_CONFIG`.
+    public var dxmtConfig: String?
 
     public init(
         executable: URL,
@@ -96,8 +128,12 @@ public struct BottleLaunchRequest: Sendable, Equatable {
         translation: LocalTranslationConfig = LocalTranslationConfig(),
         metalHUDEnabled: Bool = true,
         additionalArguments: [String] = [],
-        additionalEnvironment: [String: String] = [:]
+        additionalEnvironment: [String: String] = [:],
+        preset: PerformancePreset = .custom,
+        dxmtConfig: String? = nil
     ) {
+        self.preset = preset
+        self.dxmtConfig = dxmtConfig
         self.executable = executable
         self.bottle = bottle
         self.translation = translation

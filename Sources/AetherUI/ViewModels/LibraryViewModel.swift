@@ -34,6 +34,13 @@ public final class LibraryViewModel {
     /// Set by the grid from the window width.
     public var columns = 5
 
+    /// User-chosen presets by game id (persisted in `AetherPreferences`).
+    public private(set) var presetChoices: [GameItem.ID: PerformancePreset] = AetherPreferences.gamePresets
+    /// Wine runtimes installed by the setup wizard (shared engine folder). Refreshed on every scan.
+    public private(set) var wineBase: WineRuntime?
+    public private(set) var installedFlavors: Set<RuntimeFlavor> = []
+    public private(set) var hasDXVK = false
+
     public let hardware: MacHardwareProfile
     private let catalog: ProfileCatalog?
     private let scannerConfiguration: LibraryScanner.Configuration
@@ -41,6 +48,7 @@ public final class LibraryViewModel {
     private let artworkFetcher: ArtworkFetcher
     private let bottleRuntime: BottleRuntime?
     private let historyURL: URL
+    private let runtimeStore = WineRuntimeStore()
 
     @ObservationIgnored private var bottleEngine: BottleEngine?
     @ObservationIgnored private var requestedArtwork: Set<String> = []
@@ -121,6 +129,7 @@ public final class LibraryViewModel {
             LibraryScanner(configuration: configuration, catalog: catalog).scan()
         }.value
 
+        refreshRuntimes()
         games = result.games
         var routed: [GameItem.ID: RoutingDecision] = [:]
         for game in result.games {
@@ -140,6 +149,35 @@ public final class LibraryViewModel {
             if let url = await artworkFetcher.artwork(kind, for: game) {
                 artwork[game.id, default: [:]][kind] = url
             }
+        }
+    }
+
+    // MARK: - Runtimes & presets
+
+    public func refreshRuntimes() {
+        wineBase = runtimeStore.newestBase()
+        installedFlavors = wineBase.map { runtimeStore.installedFlavors(baseID: $0.id) } ?? []
+        hasDXVK = runtimeStore.installedDXVK() != nil
+    }
+
+    /// The user's choice, else the best preset for what is installed.
+    public func preset(for game: GameItem) -> PerformancePreset {
+        if let chosen = presetChoices[game.id] { return chosen }
+        let profileBackend = profile(for: game).localTranslation?.backend ?? .d3dmetal
+        return .recommended(profileBackend: profileBackend, installed: installedFlavors)
+    }
+
+    public func setPreset(_ preset: PerformancePreset, for game: GameItem) {
+        presetChoices[game.id] = preset
+        AetherPreferences.gamePresets = presetChoices
+    }
+
+    /// Whether a preset can run right now (its graphics stack is installed).
+    public func isAvailable(_ preset: PerformancePreset, for game: GameItem) -> Bool {
+        let backend = preset.effectiveBackend(profile(for: game).localTranslation?.backend ?? .d3dmetal)
+        switch backend {
+        case .dxvk: return wineBase != nil && hasDXVK
+        default: return installedFlavors.contains(RuntimeFlavor.forBackend(backend))
         }
     }
 
@@ -252,23 +290,51 @@ public final class LibraryViewModel {
     }
 
     private func launchLocal(_ game: GameItem) async -> Bool {
-        guard let runtime = bottleRuntime else {
-            statusMessage = "Set AETHER_WINE and AETHER_D3DMETAL to run Windows games locally."
-            return false
-        }
         guard let executable = game.installation.windowsExecutable else {
             statusMessage = "No Windows executable found for \(game.title)."
             return false
         }
-        let engine = bottleEngine ?? BottleEngine(runtime: runtime)
+        let prefix = AetherPaths.bottle(for: game.bottleName)
+        var translation = profile(for: game).localTranslation ?? LocalTranslationConfig()
+        let chosenPreset = preset(for: game)
+        let runtime: BottleRuntime
+
+        if let configured = bottleRuntime {
+            // Developer override (AETHER_WINE / AETHER_D3DMETAL): Phase 1 GPTK script path.
+            runtime = configured
+        } else {
+            // Setup-wizard runtimes: pick the flavor the preset's backend needs.
+            refreshRuntimes()
+            do {
+                guard let base = wineBase else { throw WineRuntimeError.noRuntime }
+                let backend = chosenPreset.effectiveBackend(translation.backend)
+                translation.backend = backend
+                let wine = try runtimeStore.resolve(baseID: base.id, backend: backend)
+                if !WinePrefix.isInitialized(prefix) {
+                    statusMessage = "Creating a Windows bottle for \(game.title)… (first launch only)"
+                    try await WinePrefix.initialize(prefix, runtime: wine)
+                }
+                if backend == .dxvk {
+                    guard let dxvk = runtimeStore.installedDXVK() else { throw WineRuntimeError.dxvkNotInstalled }
+                    try WinePrefix.syncDXVK(from: dxvk, into: prefix)
+                }
+                runtime = BottleRuntime(runtime: wine)
+            } catch {
+                statusMessage = String(describing: error)
+                return false
+            }
+        }
+        // A fresh engine per launch: each game can need a different runtime flavor.
+        let engine = BottleEngine(runtime: runtime)
         bottleEngine = engine
 
         do {
             let events = try await engine.launch(BottleLaunchRequest(
                 executable: executable,
-                bottle: AetherPaths.bottle(for: game.bottleName),
-                translation: profile(for: game).localTranslation ?? LocalTranslationConfig(),
-                metalHUDEnabled: AetherPreferences.metalHUDEnabled
+                bottle: prefix,
+                translation: translation,
+                metalHUDEnabled: AetherPreferences.metalHUDEnabled || chosenPreset.metalHUDDefault,
+                preset: chosenPreset
             ))
             recordLaunch(game)
             runningGameTitle = game.title
