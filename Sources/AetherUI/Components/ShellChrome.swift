@@ -116,7 +116,7 @@ struct SectionLabel: View {
 
 // MARK: - Launcher building blocks
 
-/// The big primary action. Colour follows the engine: emerald native, cyan Wine, violet cloud.
+/// The big primary action: flat accent blue for every engine (the badge says how it runs).
 struct PlayButton: View {
     let engine: ExecutionEngine?
     var isFocused = false
@@ -126,7 +126,6 @@ struct PlayButton: View {
     @State private var isHovered = false
 
     var body: some View {
-        let tint = AetherTheme.tint(for: engine)
         Button(action: action) {
             HStack(spacing: 10) {
                 Image(systemName: engine == .cloudStream ? "icloud.fill" : "play.fill")
@@ -135,20 +134,18 @@ struct PlayButton: View {
                     .font(.system(size: compact ? 13 : 17, weight: .heavy))
                     .tracking(1)
             }
-            .foregroundStyle(Color.black.opacity(engine == nil ? 0.5 : 0.88))
+            .foregroundStyle(Color.white.opacity(engine == nil ? 0.45 : 1))
             .padding(.horizontal, compact ? 18 : 34)
             .padding(.vertical, compact ? 9 : 15)
             .background(
                 RoundedRectangle(cornerRadius: 8, style: .continuous)
-                    .fill(LinearGradient(colors: [tint, tint.opacity(0.78)], startPoint: .top, endPoint: .bottom))
+                    .fill(engine == nil ? Color.white.opacity(0.08) : (isHovered ? AetherTheme.accentDeep : AetherTheme.accent))
             )
             .overlay(
                 RoundedRectangle(cornerRadius: 8, style: .continuous)
-                    .strokeBorder(isFocused ? Color.white : Color.white.opacity(isHovered ? 0.5 : 0.15), lineWidth: isFocused ? 2.5 : 1)
+                    .strokeBorder(isFocused ? Color.white : Color.clear, lineWidth: 2)
             )
-            .shadow(color: tint.opacity(isHovered || isFocused ? 0.55 : 0.25), radius: isHovered || isFocused ? 22 : 10, y: 4)
-            .brightness(isHovered ? 0.06 : 0)
-            .scaleEffect(isFocused ? 1.05 : 1)
+            .scaleEffect(isFocused ? 1.04 : 1)
         }
         .buttonStyle(.plain)
         .disabled(engine == nil)
@@ -188,7 +185,7 @@ struct GhostButton: View {
                 )
                 .overlay(
                     RoundedRectangle(cornerRadius: 8, style: .continuous)
-                        .strokeBorder(isFocused ? Color.white : AetherTheme.hairline, lineWidth: isFocused ? 2.5 : 1)
+                        .strokeBorder(isFocused ? Color.white : AetherTheme.hairline, lineWidth: isFocused ? 2 : 1)
                 )
                 .scaleEffect(isFocused ? 1.05 : 1)
         }

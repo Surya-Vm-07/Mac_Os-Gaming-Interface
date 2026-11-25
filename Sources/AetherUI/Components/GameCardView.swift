@@ -37,10 +37,9 @@ public struct GameCardView: View {
                             Button(action: onPlay) {
                                 Image(systemName: decision?.engine == .cloudStream ? "icloud.fill" : "play.fill")
                                     .font(.system(size: 14, weight: .bold))
-                                    .foregroundStyle(.black)
                                     .frame(width: 38, height: 38)
-                                    .background(Circle().fill(AetherTheme.tint(for: decision?.engine)))
-                                    .shadow(color: .black.opacity(0.4), radius: 8, y: 3)
+                                    .foregroundStyle(.white)
+                                    .background(Circle().fill(AetherTheme.accent))
                             }
                             .buttonStyle(.plain)
                             .padding(10)
@@ -53,14 +52,10 @@ public struct GameCardView: View {
                 .overlay {
                     shape.strokeBorder(
                         isFocused ? AetherTheme.cyan : Color.white.opacity(isHovered ? 0.28 : 0.07),
-                        lineWidth: isFocused ? 3 : 1
+                        lineWidth: isFocused ? 2 : 1
                     )
                 }
-                .shadow(
-                    color: isFocused ? AetherTheme.cyan.opacity(0.4) : .black.opacity(lifted ? 0.6 : 0.35),
-                    radius: lifted ? 20 : 8,
-                    y: lifted ? 10 : 4
-                )
+                .shadow(color: .black.opacity(lifted ? 0.5 : 0.3), radius: lifted ? 14 : 6, y: lifted ? 8 : 3)
 
             VStack(alignment: .leading, spacing: 3) {
                 Text(game.title)

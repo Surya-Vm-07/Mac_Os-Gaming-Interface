@@ -8,10 +8,21 @@ public enum AetherTheme {
 
     /// `#0A0B0E`
     public static var obsidian: Color { Color(red: 10 / 255, green: 11 / 255, blue: 14 / 255) }
-    public static var emerald: Color { Color(red: 0.12, green: 0.88, blue: 0.56) }
-    public static var cyan: Color { Color(red: 0.0, green: 0.86, blue: 1.0) }
-    public static var violet: Color { Color(red: 0.66, green: 0.47, blue: 1.0) }
-    public static var amber: Color { Color(red: 1.0, green: 0.73, blue: 0.12) }
+    // One cool palette, all at the same lightness so nothing shouts:
+    //   accent (blue 500/400) for actions and focus, teal = native, blue = Wine,
+    //   violet = cloud, amber reserved for warnings.
+    /// #3B82F6: primary buttons.
+    public static var accent: Color { Color(red: 59 / 255, green: 130 / 255, blue: 246 / 255) }
+    /// #2563EB: primary button pressed / hovered.
+    public static var accentDeep: Color { Color(red: 37 / 255, green: 99 / 255, blue: 235 / 255) }
+    /// #60A5FA: focus rings, labels, links.
+    public static var cyan: Color { Color(red: 96 / 255, green: 165 / 255, blue: 250 / 255) }
+    /// #5EEAD4: native.
+    public static var emerald: Color { Color(red: 94 / 255, green: 234 / 255, blue: 212 / 255) }
+    /// #A78BFA: cloud.
+    public static var violet: Color { Color(red: 167 / 255, green: 139 / 255, blue: 250 / 255) }
+    /// #FBBF24: warnings only.
+    public static var amber: Color { Color(red: 251 / 255, green: 191 / 255, blue: 36 / 255) }
     public static var unavailable: Color { Color(white: 0.55) }
     /// Elevated surfaces: panels, action bars, sidebar.
     public static var carbon: Color { Color(red: 17 / 255, green: 21 / 255, blue: 31 / 255) }
@@ -26,17 +37,18 @@ public enum AetherTheme {
         for byte in seed.utf8 {
             hash = (hash ^ UInt64(byte)) &* 0x0000_0100_0000_01b3
         }
-        let hue = Double(hash % 360) / 360
+        // Hues 195°–265° (teal → blue → indigo) so placeholders sit inside the theme.
+        let hue = (195 + Double(hash % 70)) / 360
         return [
-            Color(hue: hue, saturation: 0.62, brightness: 0.46),
-            Color(hue: (hue + 0.09).truncatingRemainder(dividingBy: 1), saturation: 0.7, brightness: 0.16),
+            Color(hue: hue, saturation: 0.45, brightness: 0.40),
+            Color(hue: hue + 0.04, saturation: 0.55, brightness: 0.14),
         ]
     }
 
     public static func tint(for engine: ExecutionEngine?) -> Color {
         switch engine {
         case .native: emerald
-        case .localTranslation: cyan
+        case .localTranslation: Color(red: 147 / 255, green: 197 / 255, blue: 253 / 255) // blue 300
         case .cloudStream: violet
         case nil: unavailable
         }

@@ -35,6 +35,8 @@ struct AetherApp: App {
                     .keyboardShortcut("1", modifiers: [.command])
                 Button("Cloud Gaming") { shell.open(.cloudHub) }
                     .keyboardShortcut("2", modifiers: [.command])
+                Button("Engine Setup") { shell.open(.setup) }
+                    .keyboardShortcut("3", modifiers: [.command])
                 Divider()
                 Button("Quick Access Drawer") { shell.toggleDrawer() }
                     .keyboardShortcut("g", modifiers: [.command, .shift])

@@ -7,6 +7,7 @@ public enum ShellRoute: Hashable, Sendable {
     case home
     case game(GameItem.ID)
     case cloudHub
+    case setup
 }
 
 /// Which half of the window the controller is driving.
@@ -18,6 +19,7 @@ public enum FocusZone: Hashable, Sendable {
 public enum SidebarEntry: Hashable, Sendable {
     case home
     case cloudHub
+    case setup
     case game(GameItem.ID)
 }
 
@@ -38,6 +40,7 @@ public final class ShellCoordinator {
     public let library: LibraryViewModel
     public let drawer: QuickDrawerModel
     public let gamepad: GamepadManager
+    public let setup: SetupModel
 
     public private(set) var route: ShellRoute = .home
     public private(set) var zone: FocusZone = .content
@@ -61,6 +64,8 @@ public final class ShellCoordinator {
         self.library = library
         self.drawer = QuickDrawerModel(library: library)
         self.gamepad = GamepadManager()
+        // After any install, the library re-reads runtimes so presets unlock immediately.
+        self.setup = SetupModel(onChange: { [weak library] in library?.refreshRuntimes() })
     }
 
     public static func makeDefault() -> ShellCoordinator {
@@ -84,8 +89,11 @@ public final class ShellCoordinator {
         return library.games.filter { $0.title.localizedCaseInsensitiveContains(query) }
     }
 
+    /// Fixed entries above the game list.
+    public static let browseEntries: [SidebarEntry] = [.home, .cloudHub, .setup]
+
     public var sidebarEntries: [SidebarEntry] {
-        [.home, .cloudHub] + filteredGames.map { .game($0.id) }
+        Self.browseEntries + filteredGames.map { .game($0.id) }
     }
 
     public func detailActions(for game: GameItem) -> [DetailAction] {
@@ -97,7 +105,7 @@ public final class ShellCoordinator {
 
     public func isSelected(_ entry: SidebarEntry) -> Bool {
         switch (entry, route) {
-        case (.home, .home), (.cloudHub, .cloudHub): true
+        case (.home, .home), (.cloudHub, .cloudHub), (.setup, .setup): true
         case (.game(let a), .game(let b)): a == b
         default: false
         }
@@ -109,6 +117,7 @@ public final class ShellCoordinator {
         switch entry {
         case .home: route = .home
         case .cloudHub: route = .cloudHub
+        case .setup: route = .setup
         case .game(let id):
             library.focus(gameID: id)
             route = .game(id)
@@ -243,6 +252,21 @@ public final class ShellCoordinator {
             handleDetail(command, game: game)
         case .cloudHub:
             handleCloudHub(command)
+        case .setup:
+            handleSetup(command)
+        }
+    }
+
+    private func handleSetup(_ command: GamepadCommand) {
+        switch command {
+        case .move(.up): setup.move(-1)
+        case .move(.down): setup.move(1)
+        case .move(.left): zone = .sidebar
+        case .move(.right): break
+        case .confirm: Task { await setup.perform(setup.focusedStep) }
+        case .back: goHome()
+        case .tertiary: setup.refresh()
+        case .secondary, .toggleDrawer, .previousTab, .nextTab: break
         }
     }
 

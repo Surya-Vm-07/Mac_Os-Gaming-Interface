@@ -25,7 +25,7 @@ struct SidebarView: View {
                         ForEach(Array(shell.sidebarEntries.enumerated()), id: \.element) { index, entry in
                             if index == 0 {
                                 SectionLabel(text: "BROWSE").padding(.horizontal, 10).padding(.top, 6).padding(.bottom, 4)
-                            } else if index == 2 {
+                            } else if index == ShellCoordinator.browseEntries.count {
                                 SectionLabel(text: "LIBRARY · \(shell.filteredGames.count)")
                                     .padding(.horizontal, 10).padding(.top, 16).padding(.bottom, 4)
                             }
@@ -119,6 +119,7 @@ private struct SidebarRow: View {
         switch entry {
         case .home: "Home"
         case .cloudHub: "Cloud Gaming"
+        case .setup: "Engine Setup"
         case .game(let id): shell.library.game(withID: id)?.title ?? "Unknown"
         }
     }
@@ -130,9 +131,12 @@ private struct SidebarRow: View {
             Image(systemName: "house.fill").frame(width: 22).foregroundStyle(.white.opacity(0.8))
         case .cloudHub:
             Image(systemName: "icloud.fill").frame(width: 22).foregroundStyle(AetherTheme.violet)
+        case .setup:
+            Image(systemName: "wrench.and.screwdriver.fill").frame(width: 22)
+                .foregroundStyle(shell.setup.isReady ? Color.white.opacity(0.8) : AetherTheme.amber)
         case .game(let id):
             // 28 pt at 2× = 56 px; tiny, and NSCache-bounded.
-            ArtworkImage(url: shell.library.artwork[id]?[.grid], maxPixelSize: 64)
+            ArtworkImage(url: shell.library.artwork[id]?[.grid], maxPixelSize: 64, placeholderSeed: shell.library.game(withID: id)?.title)
                 .frame(width: 22, height: 28)
                 .clipShape(RoundedRectangle(cornerRadius: 3))
         }

@@ -101,9 +101,8 @@ private struct CloudServiceCard: View {
         .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
         .overlay(
             RoundedRectangle(cornerRadius: 20, style: .continuous)
-                .strokeBorder(isFocused ? AetherTheme.violet : Color.white.opacity(0.08), lineWidth: isFocused ? 3 : 1)
+                .strokeBorder(isFocused ? AetherTheme.cyan : Color.white.opacity(0.08), lineWidth: isFocused ? 2 : 1)
         )
-        .shadow(color: isFocused ? AetherTheme.violet.opacity(0.45) : .clear, radius: 24)
         .scaleEffect(isFocused ? 1.04 : 1)
         .animation(AetherTheme.focusSpring, value: isFocused)
         .contentShape(Rectangle())

@@ -90,6 +90,8 @@ public struct RootView: View {
             }
         case .cloudHub:
             CloudHubView(shell: shell)
+        case .setup:
+            SetupView(shell: shell)
         }
     }
 

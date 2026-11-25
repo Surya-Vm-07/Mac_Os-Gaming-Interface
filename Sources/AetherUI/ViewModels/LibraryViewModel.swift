@@ -270,7 +270,7 @@ public final class LibraryViewModel {
         }
         switch decision.engine {
         case .native:
-            return launchNative(game) ? .started : .failed
+            return await launchNative(game) ? .started : .failed
         case .localTranslation:
             return await launchLocal(game) ? .started : .failed
         case .cloudStream:
@@ -327,12 +327,20 @@ public final class LibraryViewModel {
         try? router.route(profile: profile(for: game), installation: game.installation, hardware: hardware, preference: preference)
     }
 
-    private func launchNative(_ game: GameItem) -> Bool {
-        // Steam games go through Steam so DRM, cloud saves and the overlay work.
-        let target: URL? = game.steamAppID.flatMap { URL(string: "steam://rungameid/\($0)") }
-            ?? game.installation.nativeApplication
-        guard let target, NSWorkspace.shared.open(target) else {
-            statusMessage = "Could not launch \(game.title)."
+    private func launchNative(_ game: GameItem) async -> Bool {
+        if let appID = game.steamAppID, let steamURL = URL(string: "steam://rungameid/\(appID)") {
+            // Steam games go through Steam so DRM, cloud saves and the overlay work.
+            guard NSWorkspace.shared.open(steamURL) else {
+                statusMessage = "Steam isn't installed, so \(game.title) can't start through it."
+                return false
+            }
+        } else if let app = game.installation.nativeApplication {
+            if let failure = await openApplication(at: app) {
+                statusMessage = "Could not launch \(game.title): \(failure)"
+                return false
+            }
+        } else {
+            statusMessage = "\(game.title) has no Mac app to open."
             return false
         }
         recordLaunch(game)
@@ -343,6 +351,18 @@ public final class LibraryViewModel {
         }
         statusMessage = "Launching \(game.title)…"
         return true
+    }
+
+    /// Opens an app and returns macOS's own error message on failure (damaged or unsigned app,
+    /// iPhone-only app, wrong architecture…), instead of a bare true/false.
+    private func openApplication(at url: URL) async -> String? {
+        let configuration = NSWorkspace.OpenConfiguration()
+        configuration.activates = true
+        return await withCheckedContinuation { (continuation: CheckedContinuation<String?, Never>) in
+            NSWorkspace.shared.openApplication(at: url, configuration: configuration) { @Sendable _, error in
+                continuation.resume(returning: error?.localizedDescription)
+            }
+        }
     }
 
     private func launchLocal(_ game: GameItem) async -> Bool {
