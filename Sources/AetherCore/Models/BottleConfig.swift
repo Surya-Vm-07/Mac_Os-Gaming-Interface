@@ -22,6 +22,11 @@ public enum AetherPaths {
         URL.cachesDirectory.appending(path: "Aether/Artwork", directoryHint: .isDirectory)
     }
 
+    /// `~/Library/Application Support/Aether/play_history.json`
+    public static var playHistory: URL {
+        applicationSupport.appending(path: "play_history.json")
+    }
+
     public static func bottle(for gameID: String) -> URL {
         bottles.appending(path: gameID, directoryHint: .isDirectory)
     }

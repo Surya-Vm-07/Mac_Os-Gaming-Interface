@@ -1,7 +1,12 @@
 # Project Aether
 
-A native, controller-first gaming orchestrator for Apple Silicon Macs. It routes each game to
-**Native**, **Local Wine + D3DMetal**, or **Cloud/Remote streaming**.
+A native, controller-first game launcher for Apple Silicon Macs. It routes each game to
+**Native**, **Local Wine + D3DMetal**, or **Cloud streaming**, and streams cloud services inside
+its own window.
+
+**Business model:** a paid launcher app. Users pay for Aether; they bring their own cloud
+subscriptions (Xbox Game Pass Ultimate, GeForce NOW) and their own games. Aether hosts no games
+and needs no servers.
 
 - Product spec: [`docs/PROJECT_SPEC.md`](docs/PROJECT_SPEC.md)
 - Engine blueprint: [`docs/ENGINE_BLUEPRINT.md`](docs/ENGINE_BLUEPRINT.md)
@@ -12,8 +17,9 @@ A native, controller-first gaming orchestrator for Apple Silicon Macs. It routes
 | --- | --- | --- |
 | 1 | Hardware profiler, models, router, manifest loader, BottleEngine, CLI | Done (builds and tests green on macOS) |
 | 2 | SwiftUI shell, library scanner, artwork | Implemented (user-confirmed) |
-| 3 | GCController focus engine, Quick Overlay Drawer | **Implemented, awaiting macOS build** |
-| 4 | Streaming engine | Not started |
+| 3 | GCController focus engine, Quick Overlay Drawer | Done (builds and runs on macOS) |
+| 4 | Launcher redesign (sidebar, game page), Cloud hub + in-app streaming | **Implemented, awaiting macOS build** |
+| 5 | Licensing (paid app), onboarding, Settings, Discover/free games | Planned |
 
 ## Requirements
 
@@ -42,14 +48,28 @@ They are skipped automatically when Rosetta 2 is not installed.
 swift run AetherApp
 ```
 
+Layout: a sidebar (search, Home, Cloud Gaming, full game list) and the main page (Home grid,
+game page, or Cloud hub). Press ← at the content's left edge to enter the sidebar; → or Ⓐ goes back.
+
 | Action | Controller | Keyboard |
 | --- | --- | --- |
 | Move focus | D-pad / left stick | Arrow keys |
-| Play | Ⓐ / Cross | Return, Space |
-| Play locally anyway (low-spec override) | Ⓧ / Square | Shift+Return |
-| Rescan library | Ⓨ / Triangle | R, ⌘R |
-| Back / dismiss | Ⓑ / Circle | Esc |
-| Quick Access drawer | Home / Guide / PS, or Menu | ⇧⌘G |
+| Open game page / activate | Ⓐ / Cross | Return, Space |
+| Quick play (or set default service in Cloud hub) | Ⓧ / Square | Shift+Return |
+| Rescan (or open native app in Cloud hub) | Ⓨ / Triangle | ⌘R |
+| Back | Ⓑ / Circle | Esc |
+| Quick Access drawer (End Stream lives here) | Home / Guide / PS, or Menu | ⇧⌘G |
+| Search | — | ⌘F |
+| Home / Cloud Gaming | — | ⌘1 / ⌘2 |
+| End cloud stream | — | ⇧⌘W |
+
+### Cloud streaming
+
+Cloud Gaming opens the service's web client in a borderless in-app player. Your login persists,
+pop-up sign-ins work, and the service's fullscreen button works. Games routed to the cloud
+(kernel anti-cheat, or above this Mac's tier) open their service with a "search for <title>" hint.
+While streaming, the library is unmounted and artwork is dropped; the controller goes to the page
+through the browser's Gamepad API, and Home opens the drawer.
 
 The Quick Access drawer shows live CPU, GPU, RAM, swap, memory pressure and thermals (sampled
 only while it is open). It also toggles the Metal HUD (applies to the next Wine launch), switches

@@ -29,8 +29,18 @@ struct AetherApp: App {
         .defaultSize(width: 1440, height: 900)
         .commands {
             CommandMenu("Aether") {
+                Button("Search Library") { shell.requestSearchFocus() }
+                    .keyboardShortcut("f", modifiers: [.command])
+                Button("Home") { shell.goHome() }
+                    .keyboardShortcut("1", modifiers: [.command])
+                Button("Cloud Gaming") { shell.open(.cloudHub) }
+                    .keyboardShortcut("2", modifiers: [.command])
+                Divider()
                 Button("Quick Access Drawer") { shell.toggleDrawer() }
                     .keyboardShortcut("g", modifiers: [.command, .shift])
+                Button("End Cloud Stream") { shell.endStream() }
+                    .keyboardShortcut("w", modifiers: [.command, .shift])
+                    .disabled(shell.library.activeStream == nil)
                 Button("Rescan Library") { Task { await shell.library.refresh() } }
                     .keyboardShortcut("r", modifiers: [.command])
             }
