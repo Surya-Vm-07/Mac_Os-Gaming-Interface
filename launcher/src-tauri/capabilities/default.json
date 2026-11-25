@@ -1,0 +1,13 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "default",
+  "description": "Main window: app commands, native file dialogs, reveal-in-Finder.",
+  "windows": ["main"],
+  "permissions": [
+    "core:default",
+    "core:window:allow-start-dragging",
+    "dialog:allow-open",
+    "opener:allow-reveal-item-in-dir",
+    "opener:allow-open-path"
+  ]
+}

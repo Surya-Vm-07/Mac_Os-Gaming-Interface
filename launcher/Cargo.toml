@@ -1,0 +1,26 @@
+# Aether Launcher — Rust workspace.
+#   crates/aether-engine : pure Rust core (bottles, runtimes, env builder, SQLite, runner).
+#                          No Tauri dependency, so it builds and tests on any Unix.
+#   src-tauri            : thin Tauri v2 command layer over the engine.
+[workspace]
+resolver = "2"
+members = ["crates/aether-engine", "src-tauri"]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.85"
+license = "MIT"
+
+[workspace.dependencies]
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+thiserror = "2"
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "process", "io-util", "time", "sync", "fs"] }
+
+[profile.release]
+codegen-units = 1
+lto = true
+opt-level = "s"     # small binary; the hot paths are child processes, not this app
+panic = "abort"
+strip = true
