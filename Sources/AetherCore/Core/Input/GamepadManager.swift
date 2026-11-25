@@ -15,12 +15,16 @@ public enum GamepadCommand: Sendable, Equatable {
     case tertiary
     /// Home / Guide / PS, or Menu (☰ / Options)
     case toggleDrawer
+    /// LB / L1: previous tab or filter
+    case previousTab
+    /// RB / R1: next tab or filter
+    case nextTab
 }
 
 /// Plain-value copy of a gamepad's state, taken inside the GameController callback.
 struct PadState: Sendable, Equatable {
     enum Button: Int, Sendable, Hashable, CaseIterable {
-        case a, b, x, y, menu, home
+        case a, b, x, y, menu, home, leftShoulder, rightShoulder
 
         var command: GamepadCommand {
             switch self {
@@ -29,6 +33,8 @@ struct PadState: Sendable, Equatable {
             case .x: .secondary
             case .y: .tertiary
             case .menu, .home: .toggleDrawer
+            case .leftShoulder: .previousTab
+            case .rightShoulder: .nextTab
             }
         }
     }
@@ -54,6 +60,8 @@ struct PadState: Sendable, Equatable {
         if pad.buttonY.isPressed { buttons.insert(.y) }
         if pad.buttonMenu.isPressed { buttons.insert(.menu) }
         if pad.buttonHome?.isPressed == true { buttons.insert(.home) }
+        if pad.leftShoulder.isPressed { buttons.insert(.leftShoulder) }
+        if pad.rightShoulder.isPressed { buttons.insert(.rightShoulder) }
     }
 }
 

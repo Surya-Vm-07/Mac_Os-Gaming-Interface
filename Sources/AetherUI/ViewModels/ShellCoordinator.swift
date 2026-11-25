@@ -110,7 +110,7 @@ public final class ShellCoordinator {
         case .home: route = .home
         case .cloudHub: route = .cloudHub
         case .game(let id):
-            if let index = library.games.firstIndex(where: { $0.id == id }) { library.focus(index) }
+            library.focus(gameID: id)
             route = .game(id)
         }
         if let index = sidebarEntries.firstIndex(of: entry) { sidebarIndex = index }
@@ -216,7 +216,7 @@ public final class ShellCoordinator {
         case .move(let direction): drawer.move(direction)
         case .confirm: Task { await drawer.activateFocused() }
         case .back: toggleDrawer()
-        case .secondary, .tertiary, .toggleDrawer: break
+        case .secondary, .tertiary, .toggleDrawer, .previousTab, .nextTab: break
         }
     }
 
@@ -230,7 +230,7 @@ public final class ShellCoordinator {
         case .confirm:
             if entries.indices.contains(sidebarIndex) { open(entries[sidebarIndex]) }
         case .tertiary: Task { await library.refresh() }
-        case .secondary, .toggleDrawer: break
+        case .secondary, .toggleDrawer, .previousTab, .nextTab: break
         }
     }
 
@@ -260,6 +260,10 @@ public final class ShellCoordinator {
             Task { await library.refresh() }
         case .back:
             library.dismissStatus()
+        case .previousTab:
+            library.cycleFilter(by: -1)
+        case .nextTab:
+            library.cycleFilter(by: 1)
         case .toggleDrawer:
             break
         }
@@ -280,7 +284,7 @@ public final class ShellCoordinator {
             perform(.play, for: game)
         case .back:
             goHome()
-        case .tertiary, .toggleDrawer:
+        case .tertiary, .toggleDrawer, .previousTab, .nextTab:
             break
         }
     }
@@ -302,7 +306,7 @@ public final class ShellCoordinator {
             openNativeClient(services[cloudIndex])
         case .back:
             goHome()
-        case .toggleDrawer:
+        case .toggleDrawer, .previousTab, .nextTab:
             break
         }
     }

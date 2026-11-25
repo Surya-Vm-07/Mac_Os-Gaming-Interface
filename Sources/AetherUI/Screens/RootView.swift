@@ -28,10 +28,13 @@ public struct RootView: View {
             } else {
                 HStack(spacing: 0) {
                     SidebarView(shell: shell)
+                    // minWidth: 0 makes the page accept the window's width instead of growing
+                    // to its content's ideal width. That overflow was what cut off the edges.
                     content
-                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        .frame(minWidth: 0, maxWidth: .infinity, minHeight: 0, maxHeight: .infinity, alignment: .topLeading)
                         .clipped()
                 }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .ignoresSafeArea()
             }
 
@@ -62,6 +65,9 @@ public struct RootView: View {
             send(press.modifiers.contains(.shift) ? .secondary : .confirm)
         }
         .onKeyPress(.escape) { send(.back) }
+        .onKeyPress(characters: CharacterSet(charactersIn: "[]")) { press in
+            send(press.characters == "[" ? .previousTab : .nextTab)
+        }
         .task { shell.start() }
         .task { await shell.library.refresh() }
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.didResignActiveNotification)) { _ in

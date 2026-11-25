@@ -13,6 +13,25 @@ public enum AetherTheme {
     public static var violet: Color { Color(red: 0.66, green: 0.47, blue: 1.0) }
     public static var amber: Color { Color(red: 1.0, green: 0.73, blue: 0.12) }
     public static var unavailable: Color { Color(white: 0.55) }
+    /// Elevated surfaces: panels, action bars, sidebar.
+    public static var carbon: Color { Color(red: 17 / 255, green: 21 / 255, blue: 31 / 255) }
+    public static var carbonHigh: Color { Color(red: 24 / 255, green: 29 / 255, blue: 42 / 255) }
+    public static var hairline: Color { Color.white.opacity(0.08) }
+
+    /// Deterministic two-stop gradient for games without artwork, so every title gets its own
+    /// colour instead of the same grey slab. FNV-1a keeps it stable across launches
+    /// (`String.hashValue` is randomised per process).
+    public static func placeholderColors(for seed: String) -> [Color] {
+        var hash: UInt64 = 0xcbf2_9ce4_8422_2325
+        for byte in seed.utf8 {
+            hash = (hash ^ UInt64(byte)) &* 0x0000_0100_0000_01b3
+        }
+        let hue = Double(hash % 360) / 360
+        return [
+            Color(hue: hue, saturation: 0.62, brightness: 0.46),
+            Color(hue: (hue + 0.09).truncatingRemainder(dividingBy: 1), saturation: 0.7, brightness: 0.16),
+        ]
+    }
 
     public static func tint(for engine: ExecutionEngine?) -> Color {
         switch engine {
@@ -43,11 +62,14 @@ public enum AetherTheme {
 
     // MARK: Layout
 
-    public static let cardSize = CGSize(width: 200, height: 300)
-    public static let cardCornerRadius: CGFloat = 14
-    public static let gridSpacing: CGFloat = 28
-    /// Horizontal padding inside the scroll view, so focused cards are not clipped when scaled up.
-    public static let gridInset: CGFloat = 16
+    public static let cardSize = CGSize(width: 176, height: 264)
+    public static let cardCornerRadius: CGFloat = 10
+    public static let gridSpacing: CGFloat = 22
+    /// Extra padding around the grid, so focused cards are not clipped when scaled up.
+    public static let gridInset: CGFloat = 10
+    /// Horizontal page margin of the main content area.
+    public static let pageMargin: CGFloat = 40
+    public static let heroHeight: CGFloat = 440
 
     /// Column count for the available width. The view model needs it so up/down moves exactly one row.
     public static func columns(forWidth width: CGFloat) -> Int {

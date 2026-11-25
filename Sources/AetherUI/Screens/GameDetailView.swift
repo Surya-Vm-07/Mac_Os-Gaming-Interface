@@ -1,8 +1,9 @@
 import AetherCore
 import SwiftUI
 
-/// Game page: wide banner, Play / Play Locally / Back action bar, routing explanation, and stats.
-/// Controller: ←/→ between actions, Ⓐ activates, Ⓑ back, Ⓧ plays directly.
+/// Game page: wide banner with the title, an action bar (Play / Play Locally / Back plus stats),
+/// then two panels: "How it runs" (engine, reason, performance preset) and "Details".
+/// Controller: ←/→ between actions, Ⓐ activates, Ⓧ plays, Ⓑ back.
 struct GameDetailView: View {
     let shell: ShellCoordinator
     let game: GameItem
@@ -11,41 +12,59 @@ struct GameDetailView: View {
 
     var body: some View {
         let decision = library.decision(for: game)
+        let record = library.history.record(for: game.id)
         let actions = shell.detailActions(for: game)
 
         ScrollView(.vertical, showsIndicators: false) {
-            VStack(alignment: .leading, spacing: 26) {
+            VStack(alignment: .leading, spacing: 0) {
                 banner
 
+                // Action bar
                 HStack(spacing: 14) {
                     ForEach(Array(actions.enumerated()), id: \.element) { index, action in
-                        DetailActionButton(
-                            action: action,
-                            engine: decision?.engine,
-                            isFocused: shell.zone == .content && index == shell.detailIndex
-                        )
-                        .onTapGesture { shell.perform(action, for: game) }
+                        let focused = shell.zone == .content && index == shell.detailIndex
+                        switch action {
+                        case .play:
+                            PlayButton(engine: decision?.engine, isFocused: focused) { shell.perform(.play, for: game) }
+                        case .playLocally:
+                            GhostButton(title: "Play Locally", systemImage: "desktopcomputer", isFocused: focused) {
+                                shell.perform(.playLocally, for: game)
+                            }
+                        case .back:
+                            GhostButton(title: "Back", systemImage: "chevron.left", isFocused: focused) {
+                                shell.perform(.back, for: game)
+                            }
+                        }
                     }
-                    Spacer()
-                }
-                .padding(.horizontal, 40)
 
-                HStack(alignment: .firstTextBaseline, spacing: 12) {
+                    Rectangle().fill(AetherTheme.hairline).frame(width: 1, height: 40).padding(.horizontal, 8)
+
+                    StatPair(label: "LAST PLAYED", value: PlayStats.lastPlayed(record))
+                    StatPair(label: "PLAY TIME", value: PlayStats.playTime(record))
+                    StatPair(label: "LAUNCHES", value: "\(record?.launches ?? 0)")
+
+                    Spacer(minLength: 12)
                     ExecutionBadge(engine: decision?.engine)
-                    Text(decision?.reason.description ?? "No engine can run this game on this Mac.")
-                        .font(AetherTheme.mono(12))
-                        .foregroundStyle(.white.opacity(0.75))
                 }
-                .padding(.horizontal, 40)
+                .padding(.horizontal, AetherTheme.pageMargin)
+                .padding(.vertical, 18)
+                .background(AetherTheme.carbon.opacity(0.85))
+                .overlay(alignment: .top) { Rectangle().fill(AetherTheme.hairline).frame(height: 1) }
+                .overlay(alignment: .bottom) { Rectangle().fill(AetherTheme.hairline).frame(height: 1) }
 
-                if game.installation.windowsExecutable != nil {
-                    presetPicker
-                        .padding(.horizontal, 40)
+                // Panels
+                ViewThatFits(in: .horizontal) {
+                    HStack(alignment: .top, spacing: 22) {
+                        howItRuns
+                        details.frame(width: 360)
+                    }
+                    VStack(alignment: .leading, spacing: 22) {
+                        howItRuns
+                        details
+                    }
                 }
-
-                stats
-                    .padding(.horizontal, 40)
-                    .padding(.bottom, 40)
+                .padding(.horizontal, AetherTheme.pageMargin)
+                .padding(.vertical, 30)
             }
         }
         .task(id: game.id) {
@@ -59,35 +78,82 @@ struct GameDetailView: View {
         ZStack(alignment: .bottomLeading) {
             ArtworkImage(
                 url: library.artwork[game.id]?[.hero] ?? library.artwork[game.id]?[.grid],
-                maxPixelSize: 1920
+                maxPixelSize: 1920,
+                placeholderSeed: game.title
             )
             .frame(maxWidth: .infinity)
-            .frame(height: 360)
+            .frame(height: 380)
+            .clipped()
 
             LinearGradient(
-                colors: [.clear, AetherTheme.obsidian.opacity(0.7), AetherTheme.obsidian],
+                colors: [.clear, AetherTheme.obsidian.opacity(0.35), AetherTheme.obsidian.opacity(0.95)],
                 startPoint: .top,
                 endPoint: .bottom
             )
-            .frame(height: 360)
 
-            Text(game.title)
-                .font(AetherTheme.heroTitle)
-                .tracking(AetherTheme.heroTracking)
-                .foregroundStyle(.white)
-                .lineLimit(2)
-                .minimumScaleFactor(0.5)
-                .padding(.horizontal, 40)
-                .padding(.bottom, 10)
+            HStack(alignment: .bottom, spacing: 22) {
+                // Small cover, like a store capsule next to the title.
+                ArtworkImage(url: library.artwork[game.id]?[.grid], maxPixelSize: 360, placeholderTitle: game.title)
+                    .frame(width: 120, height: 180)
+                    .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+                    .overlay(RoundedRectangle(cornerRadius: 8, style: .continuous).strokeBorder(Color.white.opacity(0.15)))
+                    .shadow(color: .black.opacity(0.6), radius: 18, y: 8)
+
+                VStack(alignment: .leading, spacing: 8) {
+                    Text(sourceLabel.uppercased())
+                        .font(AetherTheme.mono(11, weight: .bold))
+                        .tracking(2.5)
+                        .foregroundStyle(AetherTheme.cyan)
+                    Text(game.title)
+                        .font(.system(size: 50, weight: .heavy))
+                        .tracking(-1.5)
+                        .foregroundStyle(.white)
+                        .lineLimit(2)
+                        .minimumScaleFactor(0.5)
+                        .shadow(color: .black.opacity(0.45), radius: 12, y: 4)
+                }
+            }
+            .padding(.horizontal, AetherTheme.pageMargin)
+            .padding(.bottom, 26)
         }
-        .frame(height: 360)
+        .frame(height: 380)
         .clipped()
     }
 
-    // MARK: Preset
+    // MARK: Panels
+
+    private var howItRuns: some View {
+        let decision = library.decision(for: game)
+        return Panel(title: "HOW IT RUNS") {
+            HStack(alignment: .firstTextBaseline, spacing: 10) {
+                ExecutionBadge(engine: decision?.engine)
+                Text(decision?.reason.description ?? "No engine can run this game on this Mac.")
+                    .font(AetherTheme.mono(12))
+                    .foregroundStyle(.white.opacity(0.8))
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            if game.installation.windowsExecutable != nil {
+                Divider().overlay(AetherTheme.hairline)
+                presetPicker
+            }
+        }
+    }
+
+    private var details: some View {
+        let profile = library.profile(for: game)
+        let location = game.installation.nativeApplication ?? game.installation.windowsExecutable ?? game.installDirectory
+        return Panel(title: "DETAILS") {
+            DetailRow(label: "SOURCE", value: sourceLabel)
+            DetailRow(label: "REQUIREMENT", value: requirementLabel(profile))
+            DetailRow(label: "THIS MAC", value: "Tier \(library.hardware.tier.rawValue) · \(library.hardware.totalMemoryGB) GB")
+            if let location {
+                DetailRow(label: "LOCATION", value: location.path(percentEncoded: false))
+            }
+        }
+    }
 
     /// Per-game performance preset (Windows games). Presets whose graphics stack is not installed
-    /// stay listed but are marked, so the user sees what the setup wizard would unlock.
+    /// stay listed but marked, so the user sees what the setup wizard would unlock.
     private var presetPicker: some View {
         let current = library.preset(for: game)
         let selection = Binding<PerformancePreset>(
@@ -95,148 +161,67 @@ struct GameDetailView: View {
             set: { library.setPreset($0, for: game) }
         )
         return VStack(alignment: .leading, spacing: 10) {
-            HStack(spacing: 14) {
+            HStack(spacing: 12) {
                 SectionLabel(text: "PERFORMANCE PRESET")
-                Picker("Preset", selection: selection) {
-                    ForEach(PerformancePreset.allCases) { preset in
-                        Text(library.isAvailable(preset, for: game) ? preset.displayName : "\(preset.displayName) (not installed)")
-                            .tag(preset)
-                    }
-                }
-                .pickerStyle(.menu)
-                .labelsHidden()
-                .frame(width: 260)
+                Spacer()
                 if let base = library.wineBase {
                     Text("\(base.name) \(base.version)")
-                        .font(AetherTheme.mono(11))
+                        .font(AetherTheme.mono(10))
                         .foregroundStyle(.white.opacity(0.45))
                 }
             }
+            Picker("Preset", selection: selection) {
+                ForEach(PerformancePreset.allCases) { preset in
+                    Text(library.isAvailable(preset, for: game) ? preset.displayName : "\(preset.displayName) (not installed)")
+                        .tag(preset)
+                }
+            }
+            .pickerStyle(.menu)
+            .labelsHidden()
+            .frame(maxWidth: 300, alignment: .leading)
             Text(current.summary)
                 .font(AetherTheme.mono(11))
                 .foregroundStyle(.white.opacity(0.6))
             if !library.isAvailable(current, for: game) {
-                Text("This preset's graphics stack isn't installed. Open the setup wizard, or pick another preset.")
+                Text("This preset's graphics stack isn't installed. Run the setup wizard, or pick another preset.")
                     .font(AetherTheme.mono(11, weight: .bold))
                     .foregroundStyle(AetherTheme.amber)
+                    .fixedSize(horizontal: false, vertical: true)
             }
         }
-    }
-
-    // MARK: Stats
-
-    private var stats: some View {
-        let record = library.history.record(for: game.id)
-        let profile = library.profile(for: game)
-
-        return Grid(alignment: .leading, horizontalSpacing: 48, verticalSpacing: 18) {
-            GridRow {
-                StatCell(label: "LAST PLAYED", value: record.map { $0.lastPlayed.formatted(.relative(presentation: .named)) } ?? "Never")
-                StatCell(label: "PLAY TIME", value: playTime(record?.secondsPlayed ?? 0))
-                StatCell(label: "LAUNCHES", value: "\(record?.launches ?? 0)")
-            }
-            GridRow {
-                StatCell(label: "SOURCE", value: sourceLabel)
-                StatCell(label: "LOCAL REQUIREMENT", value: requirementLabel(profile))
-                StatCell(label: "THIS MAC", value: "TIER \(library.hardware.tier.rawValue) · \(library.hardware.totalMemoryGB) GB")
-            }
-            if let location = (game.installation.nativeApplication ?? game.installation.windowsExecutable ?? game.installDirectory) {
-                GridRow {
-                    StatCell(label: "LOCATION", value: location.path(percentEncoded: false))
-                        .gridCellColumns(3)
-                }
-            }
-        }
-        .padding(22)
-        .background(.white.opacity(0.04), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
     }
 
     private var sourceLabel: String {
         switch game.source {
         case .steam(let appID): "Steam · \(appID)"
-        case .macApplication: "macOS app"
-        case .customFolder: "Custom folder"
+        case .macApplication: "Mac app"
+        case .customFolder: "Aether Games folder"
         }
     }
 
     private func requirementLabel(_ profile: GameProfile) -> String {
         if profile.hasKernelAnticheat { return "Cloud only (kernel anti-cheat)" }
         if profile.minLocalTier > HardwareTier.ultra.rawValue { return "Cloud only" }
-        return "TIER \(profile.minLocalTier)+"
-    }
-
-    private func playTime(_ seconds: Double) -> String {
-        let minutes = Int(seconds / 60)
-        if minutes < 1 { return "—" }
-        if minutes < 60 { return "\(minutes) min" }
-        return String(format: "%.1f h", seconds / 3600)
+        return "Tier \(profile.minLocalTier)+ for local play"
     }
 }
 
-private struct StatCell: View {
+private struct DetailRow: View {
     let label: String
     let value: String
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            SectionLabel(text: label)
-            Text(value)
-                .font(AetherTheme.mono(13, weight: .semibold))
-                .foregroundStyle(.white.opacity(0.9))
-                .lineLimit(2)
-                .textSelection(.enabled)
-        }
-    }
-}
-
-private struct DetailActionButton: View {
-    let action: DetailAction
-    let engine: ExecutionEngine?
-    let isFocused: Bool
-
-    var body: some View {
-        HStack(spacing: 10) {
-            Image(systemName: icon)
+        VStack(alignment: .leading, spacing: 3) {
             Text(label)
-                .font(.system(size: 16, weight: .heavy))
-                .tracking(0.5)
-        }
-        .padding(.horizontal, isPrimary ? 34 : 22)
-        .padding(.vertical, 14)
-        .foregroundStyle(isPrimary ? Color.black : Color.white)
-        .background(
-            RoundedRectangle(cornerRadius: 10, style: .continuous)
-                .fill(isPrimary ? AetherTheme.tint(for: engine) : Color.white.opacity(0.1))
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: 10, style: .continuous)
-                .strokeBorder(isFocused ? Color.white : Color.clear, lineWidth: 2.5)
-        )
-        .shadow(color: isFocused ? AetherTheme.tint(for: engine).opacity(0.5) : .clear, radius: 16)
-        .scaleEffect(isFocused ? 1.06 : 1)
-        .animation(AetherTheme.focusSpring, value: isFocused)
-        .contentShape(Rectangle())
-    }
-
-    private var isPrimary: Bool { action == .play }
-
-    private var label: String {
-        switch action {
-        case .play:
-            if engine == nil { return "UNAVAILABLE" }
-            return engine == .cloudStream ? "STREAM" : "PLAY"
-        case .playLocally:
-            return "PLAY LOCALLY"
-        case .back:
-            return "BACK"
-        }
-    }
-
-    private var icon: String {
-        switch action {
-        case .play: engine == .cloudStream ? "icloud.fill" : "play.fill"
-        case .playLocally: "desktopcomputer"
-        case .back: "chevron.left"
+                .font(AetherTheme.mono(10, weight: .bold))
+                .tracking(1.5)
+                .foregroundStyle(.white.opacity(0.4))
+            Text(value)
+                .font(AetherTheme.mono(12, weight: .semibold))
+                .foregroundStyle(.white.opacity(0.9))
+                .lineLimit(3)
+                .truncationMode(.middle)
+                .textSelection(.enabled)
         }
     }
 }

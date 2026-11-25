@@ -51,6 +51,8 @@ struct ArtworkImage: View {
     let url: URL?
     let maxPixelSize: Int
     var placeholderTitle: String? = nil
+    /// Seeds the placeholder colour; defaults to `placeholderTitle`.
+    var placeholderSeed: String? = nil
 
     @State private var image: CGImage?
 
@@ -80,16 +82,18 @@ struct ArtworkImage: View {
     private var placeholder: some View {
         ZStack {
             LinearGradient(
-                colors: [Color(white: 0.16), Color(white: 0.07)],
+                colors: AetherTheme.placeholderColors(for: placeholderSeed ?? placeholderTitle ?? ""),
                 startPoint: .topLeading,
                 endPoint: .bottomTrailing
             )
             if let placeholderTitle {
                 Text(placeholderTitle)
-                    .font(.system(size: 18, weight: .heavy))
+                    .font(.system(size: 20, weight: .black))
+                    .tracking(-0.4)
                     .multilineTextAlignment(.center)
-                    .foregroundStyle(.white.opacity(0.35))
-                    .padding(16)
+                    .foregroundStyle(.white.opacity(0.92))
+                    .shadow(color: .black.opacity(0.35), radius: 6, y: 2)
+                    .padding(18)
             }
         }
     }

@@ -49,9 +49,9 @@ struct SidebarView: View {
                 }
             }
         }
-        .frame(width: 270)
+        .frame(width: 260)
         .frame(maxHeight: .infinity, alignment: .top)
-        .background(Color.black.opacity(0.35))
+        .background(AetherTheme.carbon.opacity(0.92))
         .background(.ultraThinMaterial)
         .overlay(alignment: .trailing) {
             Rectangle().fill(.white.opacity(0.06)).frame(width: 1)

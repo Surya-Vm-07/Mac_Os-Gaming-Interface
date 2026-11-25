@@ -10,6 +10,22 @@ public enum LaunchOutcome: Sendable, Equatable {
     case failed
 }
 
+/// Library filter pills (Home). Cycled with LB/RB or [ / ].
+public enum LibraryFilter: String, CaseIterable, Identifiable, Sendable {
+    case all, native, windows, cloud
+
+    public var id: String { rawValue }
+
+    public var title: String {
+        switch self {
+        case .all: "All Games"
+        case .native: "Mac Native"
+        case .windows: "Windows"
+        case .cloud: "Cloud"
+        }
+    }
+}
+
 /// Library data, routing, play history and launching. Navigation state lives in `ShellCoordinator`.
 @MainActor
 @Observable
@@ -31,8 +47,12 @@ public final class LibraryViewModel {
     /// Cloud service currently streaming inside Aether's window.
     public private(set) var activeStream: CloudService?
 
-    /// Set by the grid from the window width.
+    /// Set by the Home page from its width.
     public var columns = 5
+
+    public var filter: LibraryFilter = .all {
+        didSet { if filter != oldValue { focusedIndex = 0 } }
+    }
 
     /// User-chosen presets by game id (persisted in `AetherPreferences`).
     public private(set) var presetChoices: [GameItem.ID: PerformancePreset] = AetherPreferences.gamePresets
@@ -83,8 +103,33 @@ public final class LibraryViewModel {
 
     // MARK: - Lookups
 
+    /// Games shown on Home under the current filter. Focus indexes into this list.
+    public var visibleGames: [GameItem] {
+        games.filter { matches($0, filter) }
+    }
+
+    public func count(for filter: LibraryFilter) -> Int {
+        games.filter { matches($0, filter) }.count
+    }
+
+    private func matches(_ game: GameItem, _ filter: LibraryFilter) -> Bool {
+        switch filter {
+        case .all: true
+        case .native: decisions[game.id]?.engine == .native
+        case .windows: decisions[game.id]?.engine == .localTranslation
+        case .cloud: decisions[game.id]?.engine == .cloudStream
+        }
+    }
+
+    public func cycleFilter(by step: Int) {
+        let all = LibraryFilter.allCases
+        let index = all.firstIndex(of: filter) ?? 0
+        filter = all[(index + step + all.count) % all.count]
+    }
+
     public var focusedGame: GameItem? {
-        games.indices.contains(focusedIndex) ? games[focusedIndex] : nil
+        let visible = visibleGames
+        return visible.indices.contains(focusedIndex) ? visible[focusedIndex] : nil
     }
 
     public func game(withID id: GameItem.ID) -> GameItem? {
@@ -136,7 +181,7 @@ public final class LibraryViewModel {
             routed[game.id] = route(game)
         }
         decisions = routed
-        focusedIndex = min(focusedIndex, max(games.count - 1, 0))
+        focusedIndex = min(focusedIndex, max(visibleGames.count - 1, 0))
         if games.isEmpty {
             statusMessage = "No games found. Install a game or open Cloud Gaming in the sidebar."
         }
@@ -184,12 +229,23 @@ public final class LibraryViewModel {
     // MARK: - Focus & status
 
     public func moveFocus(_ direction: FocusDirection) {
-        focusedIndex = GridNavigator.move(from: focusedIndex, direction, count: games.count, columns: columns)
+        focusedIndex = GridNavigator.move(from: focusedIndex, direction, count: visibleGames.count, columns: columns)
     }
 
+    /// Focuses an index in `visibleGames`.
     public func focus(_ index: Int) {
-        guard games.indices.contains(index) else { return }
+        guard visibleGames.indices.contains(index) else { return }
         focusedIndex = index
+    }
+
+    /// Focuses a game by id, switching to "All Games" if the current filter hides it.
+    public func focus(gameID: GameItem.ID) {
+        if let index = visibleGames.firstIndex(where: { $0.id == gameID }) {
+            focusedIndex = index
+        } else if games.contains(where: { $0.id == gameID }) {
+            filter = .all
+            if let index = visibleGames.firstIndex(where: { $0.id == gameID }) { focusedIndex = index }
+        }
     }
 
     public func showStatus(_ message: String) {
