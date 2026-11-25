@@ -124,6 +124,7 @@ struct PlayButton: View {
     let engine: ExecutionEngine?
     var isFocused = false
     var compact = false
+    var isLaunching = false
     let action: () -> Void
 
     @State private var isHovered = false
@@ -131,9 +132,13 @@ struct PlayButton: View {
     var body: some View {
         Button(action: action) {
             HStack(spacing: 10) {
-                Image(systemName: engine == .cloudStream ? "icloud.fill" : "play.fill")
-                    .font(.system(size: compact ? 13 : 16, weight: .bold))
-                Text(label)
+                if isLaunching {
+                    ProgressView().controlSize(.small).tint(.white)
+                } else {
+                    Image(systemName: engine == .cloudStream ? "icloud.fill" : "play.fill")
+                        .font(.system(size: compact ? 13 : 16, weight: .bold))
+                }
+                Text(isLaunching ? "STARTING…" : label)
                     .font(.system(size: compact ? 13 : 17, weight: .heavy))
                     .tracking(1)
             }
@@ -151,7 +156,7 @@ struct PlayButton: View {
             .scaleEffect(isFocused ? 1.04 : 1)
         }
         .buttonStyle(.plain)
-        .disabled(engine == nil)
+        .disabled(engine == nil || isLaunching)
         .onHover { isHovered = $0 }
         .animation(AetherTheme.focusSpring, value: isHovered)
         .animation(AetherTheme.focusSpring, value: isFocused)

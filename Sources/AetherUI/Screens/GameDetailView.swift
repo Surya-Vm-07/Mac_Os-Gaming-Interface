@@ -25,7 +25,9 @@ struct GameDetailView: View {
                         let focused = shell.zone == .content && index == shell.detailIndex
                         switch action {
                         case .play:
-                            PlayButton(engine: decision?.engine, isFocused: focused) { shell.perform(.play, for: game) }
+                            PlayButton(engine: decision?.engine, isFocused: focused, isLaunching: library.launchingGameID == game.id) {
+                                shell.perform(.play, for: game)
+                            }
                         case .playLocally:
                             GhostButton(title: "Play Locally", systemImage: "desktopcomputer", isFocused: focused) {
                                 shell.perform(.playLocally, for: game)

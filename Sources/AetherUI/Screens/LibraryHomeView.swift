@@ -87,6 +87,11 @@ private struct FeaturedHero: View {
             .frame(maxWidth: .infinity)
             .frame(height: AetherTheme.heroHeight)
             .clipped()
+            .contentShape(Rectangle())
+            .onTapGesture {
+                // The banner itself is a Play button.
+                if let game { Task { await shell.play(game, preference: .automatic) } }
+            }
 
             // Readability: dark from the left (text side) and fade into the page at the bottom.
             LinearGradient(
@@ -152,7 +157,7 @@ private struct FeaturedHero: View {
                     .padding(.top, 2)
 
                     HStack(spacing: 12) {
-                        PlayButton(engine: decision?.engine) {
+                        PlayButton(engine: decision?.engine, isLaunching: library.launchingGameID == game.id) {
                             Task { await shell.play(game, preference: .automatic) }
                         }
                         GhostButton(title: "Details", systemImage: "info.circle") {
@@ -194,6 +199,8 @@ private struct FilterBar: View {
                 }
             }
             Spacer(minLength: 12)
+            ControlHint(key: "Ⓐ ⏎", label: "Play")
+            ControlHint(key: "Ⓧ ⇧⏎", label: "Details")
             ControlHint(key: "LB RB  [ ]", label: "Switch")
             ControlHint(key: "⌂ ⇧⌘G", label: "Quick Access")
         }
@@ -283,8 +290,18 @@ private struct RecentTile: View {
                 .fill(isHovered ? AetherTheme.carbonHigh : AetherTheme.carbon)
         )
         .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous).strokeBorder(AetherTheme.hairline))
+        .overlay {
+            if shell.library.launchingGameID == game.id {
+                RoundedRectangle(cornerRadius: 12, style: .continuous).fill(.black.opacity(0.5))
+                ProgressView().controlSize(.small).tint(.white)
+            }
+        }
         .onHover { isHovered = $0 }
-        .onTapGesture { shell.openGame(game) }
+        .onTapGesture { Task { await shell.play(game, preference: .automatic) } }
+        .contextMenu {
+            Button("Play") { Task { await shell.play(game, preference: .automatic) } }
+            Button("Details") { shell.openGame(game) }
+        }
         .task { await shell.library.loadArtwork(for: game, kinds: [.grid]) }
     }
 }
@@ -311,10 +328,19 @@ private struct CoverGrid: View {
                     decision: library.decision(for: game),
                     artworkURL: library.artwork[game.id]?[.grid],
                     isFocused: shell.zone == .content && index == library.focusedIndex,
-                    onPlay: { Task { await shell.play(game, preference: .automatic) } }
+                    isLaunching: library.launchingGameID == game.id,
+                    onDetails: { shell.openGame(game) }
                 )
                 .id(game.id)
-                .onTapGesture { shell.openGame(game) }
+                .onTapGesture {
+                    library.focus(index)
+                    Task { await shell.play(game, preference: .automatic) }
+                }
+                .contextMenu {
+                    Button("Play") { Task { await shell.play(game, preference: .automatic) } }
+                    Button("Play Locally (low spec)") { Task { await shell.play(game, preference: .preferLocal) } }
+                    Button("Details") { shell.openGame(game) }
+                }
                 .task { await library.loadArtwork(for: game, kinds: [.grid]) }
             }
         }

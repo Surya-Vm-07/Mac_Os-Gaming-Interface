@@ -324,9 +324,10 @@ public final class ShellCoordinator {
         case .move(let direction):
             library.moveFocus(direction)
         case .confirm:
-            if let game = library.focusedGame { openGame(game) }
-        case .secondary:
+            // Ⓐ / Return plays straight from the banner or cover.
             if let game = library.focusedGame { Task { await play(game, preference: .automatic) } }
+        case .secondary:
+            if let game = library.focusedGame { openGame(game) }
         case .tertiary:
             Task { await library.refresh() }
         case .back:

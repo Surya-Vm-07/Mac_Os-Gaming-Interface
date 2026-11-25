@@ -8,16 +8,25 @@ public struct GameCardView: View {
     let decision: RoutingDecision?
     let artworkURL: URL?
     let isFocused: Bool
-    let onPlay: (() -> Void)?
+    let isLaunching: Bool
+    let onDetails: (() -> Void)?
 
     @State private var isHovered = false
 
-    public init(game: GameItem, decision: RoutingDecision?, artworkURL: URL?, isFocused: Bool, onPlay: (() -> Void)? = nil) {
+    public init(
+        game: GameItem,
+        decision: RoutingDecision?,
+        artworkURL: URL?,
+        isFocused: Bool,
+        isLaunching: Bool = false,
+        onDetails: (() -> Void)? = nil
+    ) {
         self.game = game
         self.decision = decision
         self.artworkURL = artworkURL
         self.isFocused = isFocused
-        self.onPlay = onPlay
+        self.isLaunching = isLaunching
+        self.onDetails = onDetails
     }
 
     public var body: some View {
@@ -29,31 +38,44 @@ public struct GameCardView: View {
             ArtworkImage(url: artworkURL, maxPixelSize: 540, placeholderTitle: game.title)
                 .frame(width: AetherTheme.cardSize.width, height: AetherTheme.cardSize.height)
                 .clipShape(shape)
-                .overlay(alignment: .bottom) {
-                    // Sheen + quick play on hover / focus.
-                    ZStack(alignment: .bottomTrailing) {
-                        LinearGradient(colors: [.clear, .black.opacity(0.55)], startPoint: .center, endPoint: .bottom)
-                        if lifted, let onPlay, decision != nil {
-                            Button(action: onPlay) {
-                                Image(systemName: decision?.engine == .cloudStream ? "icloud.fill" : "play.fill")
-                                    .font(.system(size: 14, weight: .bold))
-                                    .frame(width: 38, height: 38)
-                                    .foregroundStyle(.white)
-                                    .background(Circle().fill(AetherTheme.accent))
-                            }
-                            .buttonStyle(.plain)
-                            .padding(10)
-                            .transition(.scale.combined(with: .opacity))
+                .overlay {
+                    // Clicking anywhere on the cover plays. Hover shows that clearly, plus ⓘ for details.
+                    ZStack {
+                        Color.black.opacity(isLaunching ? 0.55 : (lifted ? 0.28 : 0))
+                        if isLaunching {
+                            ProgressView().controlSize(.regular).tint(.white)
+                        } else if lifted, decision != nil {
+                            Label(decision?.engine == .cloudStream ? "STREAM" : "PLAY",
+                                  systemImage: decision?.engine == .cloudStream ? "icloud.fill" : "play.fill")
+                                .font(.system(size: 13, weight: .heavy))
+                                .foregroundStyle(.white)
+                                .padding(.horizontal, 16)
+                                .padding(.vertical, 9)
+                                .background(Capsule().fill(AetherTheme.accent))
+                                .transition(.opacity)
                         }
                     }
                     .clipShape(shape)
-                    .opacity(lifted ? 1 : 0)
+                    .allowsHitTesting(false)
+                }
+                .overlay(alignment: .topTrailing) {
+                    if lifted, !isLaunching, let onDetails {
+                        Button(action: onDetails) {
+                            Image(systemName: "info.circle.fill")
+                                .font(.system(size: 18))
+                                .foregroundStyle(.white.opacity(0.9))
+                                .padding(8)
+                        }
+                        .buttonStyle(.plain)
+                        .help("Details")
+                    }
                 }
                 .overlay {
                     shape.strokeBorder(
                         isFocused ? AetherTheme.cyan : Color.white.opacity(isHovered ? 0.28 : 0.07),
                         lineWidth: isFocused ? 2 : 1
                     )
+                    .allowsHitTesting(false)
                 }
                 .shadow(color: .black.opacity(lifted ? 0.5 : 0.3), radius: lifted ? 14 : 6, y: lifted ? 8 : 3)
 

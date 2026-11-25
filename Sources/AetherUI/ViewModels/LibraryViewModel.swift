@@ -150,6 +150,9 @@ public final class LibraryViewModel {
 
     public var isGameRunning: Bool { runningGameTitle != nil }
 
+    /// Set from the click until the game is actually running (spinners on cover and Play button).
+    public private(set) var launchingGameID: GameItem.ID?
+
     /// "Back to Library" during a Wine session: show the launcher while the game keeps running.
     public private(set) var libraryShownDuringSession = false
 
@@ -276,6 +279,9 @@ public final class LibraryViewModel {
             statusMessage = "\(runningGameTitle ?? "A game") is still running."
             return .failed
         }
+        guard launchingGameID == nil else { return .failed } // a click while something is starting
+        launchingGameID = game.id
+        defer { if launchingGameID == game.id { launchingGameID = nil } }
         guard let decision = route(game, preference: preference) else {
             statusMessage = "No engine can run \(game.title) on this Mac."
             return .failed
@@ -385,6 +391,7 @@ public final class LibraryViewModel {
         let prefix = AetherPaths.bottle(for: game.bottleName)
         var translation = profile(for: game).localTranslation ?? LocalTranslationConfig()
         let chosenPreset = preset(for: game)
+        var activePreset = chosenPreset
         let runtime: BottleRuntime
 
         if let configured = bottleRuntime {
@@ -394,8 +401,14 @@ public final class LibraryViewModel {
             // Setup-wizard runtimes: pick the flavor the preset's backend needs.
             refreshRuntimes()
             do {
-                guard let base = wineBase else { throw WineRuntimeError.noRuntime }
-                let backend = chosenPreset.effectiveBackend(translation.backend)
+                // "Just play": anything missing is installed now, once, with progress in the toast.
+                try await ensureRosetta()
+                let base = try await ensureWine()
+                let wanted = chosenPreset.effectiveBackend(translation.backend)
+                let backend = await ensureBackend(wanted, base: base)
+                if backend != wanted {
+                    activePreset = backend == .dxmt ? .dx11DXMT : .compatibility
+                }
                 translation.backend = backend
                 let wine = try runtimeStore.resolve(baseID: base.id, backend: backend)
                 if !WinePrefix.isInitialized(prefix) {
@@ -421,13 +434,14 @@ public final class LibraryViewModel {
                 executable: executable,
                 bottle: prefix,
                 translation: translation,
-                metalHUDEnabled: AetherPreferences.metalHUDEnabled || chosenPreset.metalHUDDefault,
-                preset: chosenPreset
+                metalHUDEnabled: AetherPreferences.metalHUDEnabled || activePreset.metalHUDDefault,
+                preset: activePreset
             ))
             recordLaunch(game)
             runningGameTitle = game.title
+            launchingGameID = nil
             libraryShownDuringSession = false
-            statusMessage = nil
+            if activePreset == chosenPreset { statusMessage = nil }
             ImagePipeline.shared.purge()
             let started = ContinuousClock.now
 
@@ -447,6 +461,73 @@ public final class LibraryViewModel {
             statusMessage = String(describing: error)
             return false
         }
+    }
+
+    // MARK: - Automatic setup on Play
+
+    private func ensureRosetta() async throws {
+        guard !RuntimeInstaller.isRosettaInstalled else { return }
+        statusMessage = "Installing Rosetta 2 (one-time): macOS will ask for your password…"
+        try await RuntimeInstaller.installRosetta()
+    }
+
+    private func ensureWine() async throws -> WineRuntime {
+        if let base = wineBase { return base }
+        try await installWithStatus("Downloading Wine") { progress in
+            _ = try await RuntimeInstaller().installWine(progress: progress)
+        }
+        guard let base = wineBase else { throw WineRuntimeError.noRuntime }
+        return base
+    }
+
+    /// Returns the backend to actually use: installs DXMT / DXVK when missing; D3DMetal can't be
+    /// downloaded (Apple license), so it falls back to DXMT, and if that fails too, to WineD3D.
+    private func ensureBackend(_ backend: TranslationBackend, base: WineRuntime) async -> TranslationBackend {
+        switch backend {
+        case .wined3d:
+            return .wined3d
+        case .dxvk:
+            if hasDXVK { return .dxvk }
+            let installed = (try? await installWithStatus("Downloading DXVK") { progress in
+                _ = try await RuntimeInstaller().installDXVK(progress: progress)
+            }) != nil
+            return installed && hasDXVK ? .dxvk : .wined3d
+        case .dxmt, .d3dmetal:
+            if backend == .d3dmetal, installedFlavors.contains(.d3dmetal) { return .d3dmetal }
+            if !installedFlavors.contains(.dxmt) {
+                _ = try? await installWithStatus("Downloading DXMT") { progress in
+                    _ = try await RuntimeInstaller().installDXMT(base: base, progress: progress)
+                }
+            }
+            let resolved: TranslationBackend = installedFlavors.contains(.dxmt) ? .dxmt : .wined3d
+            if backend == .d3dmetal {
+                statusMessage = "D3DMetal isn't installed (it needs your free Apple GPTK download, see Engine Setup). Using \(resolved.label) instead."
+            }
+            return resolved
+        }
+    }
+
+    private func installWithStatus(
+        _ label: String,
+        _ work: (RuntimeInstaller.Progress) async throws -> Void
+    ) async throws {
+        statusMessage = "\(label) (one-time)…"
+        let progress: RuntimeInstaller.Progress = { [weak self] update in
+            Task { @MainActor in
+                guard let self else { return }
+                switch update {
+                case .downloading(let received, let total):
+                    let percent = total.map { " \(Int(Double(received) / Double(max($0, 1)) * 100))%" } ?? ""
+                    self.statusMessage = "\(label) (one-time)…\(percent)"
+                case .extracting, .installing:
+                    self.statusMessage = "\(label): installing…"
+                default:
+                    break
+                }
+            }
+        }
+        defer { refreshRuntimes() }
+        try await work(progress)
     }
 
     // MARK: - Bottles
