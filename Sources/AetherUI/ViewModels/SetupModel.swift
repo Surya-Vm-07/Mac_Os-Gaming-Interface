@@ -8,13 +8,14 @@ import Observation
 public final class SetupModel {
 
     public enum Step: String, CaseIterable, Identifiable, Sendable {
-        case rosetta, wine, d3dmetal, dxmt, dxvk
+        case rosetta, wine, steam, d3dmetal, dxmt, dxvk
         public var id: String { rawValue }
 
         public var title: String {
             switch self {
             case .rosetta: "Rosetta 2"
             case .wine: "Wine Staging runtime"
+            case .steam: "Steam for Windows"
             case .d3dmetal: "D3DMetal (Apple GPTK)"
             case .dxmt: "DXMT"
             case .dxvk: "DXVK (macOS)"
@@ -25,6 +26,7 @@ public final class SetupModel {
             switch self {
             case .rosetta: "checkmark.shield"
             case .wine: "wineglass"
+            case .steam: "person.crop.circle.badge.checkmark"
             case .d3dmetal: "cpu"
             case .dxmt: "square.stack.3d.up"
             case .dxvk: "square.stack.3d.down.right"
@@ -38,6 +40,7 @@ public final class SetupModel {
     public private(set) var base: WineRuntime?
     public private(set) var flavors: Set<RuntimeFlavor> = []
     public private(set) var hasDXVK = false
+    public private(set) var hasWindowsSteam = WindowsSteam.isInstalled
     public private(set) var gptkCandidates: [URL] = []
     public private(set) var busyStep: Step?
     public private(set) var progress: InstallProgress?
@@ -61,6 +64,7 @@ public final class SetupModel {
         base = store.newestBase()
         flavors = base.map { store.installedFlavors(baseID: $0.id) } ?? []
         hasDXVK = store.installedDXVK() != nil
+        hasWindowsSteam = WindowsSteam.isInstalled
         gptkCandidates = RuntimeInstaller.detectGPTK()
     }
 
@@ -68,6 +72,7 @@ public final class SetupModel {
         switch step {
         case .rosetta: rosettaInstalled
         case .wine: base != nil
+        case .steam: hasWindowsSteam
         case .d3dmetal: flavors.contains(.d3dmetal)
         case .dxmt: flavors.contains(.dxmt)
         case .dxvk: hasDXVK
@@ -81,6 +86,10 @@ public final class SetupModel {
         case .wine:
             base.map { "\($0.name) \($0.version) installed." }
                 ?? "Free Gcenx macOS build from GitHub (~200 MB). No CrossOver, no Homebrew."
+        case .steam:
+            hasWindowsSteam
+                ? "Installed. Open Steam to sign in and install your Windows games; they show up in your library."
+                : "Valve's official Windows client in its own bottle. Sign in inside Steam's window (Aether never sees your password); your games then run with Steam's DRM."
         case .d3dmetal:
             isDone(.d3dmetal)
                 ? "Imported. DX12/DX11 AAA path ready."
@@ -100,6 +109,7 @@ public final class SetupModel {
         switch step {
         case .rosetta: return "Install"
         case .wine: return "Download"
+        case .steam: return base == nil ? nil : "Install"
         case .d3dmetal: return base == nil ? nil : (gptkCandidates.isEmpty ? "Choose Folder…" : "Import")
         case .dxmt: return base == nil ? nil : "Download"
         case .dxvk: return "Download"
@@ -141,6 +151,9 @@ public final class SetupModel {
                 try await RuntimeInstaller.installRosetta()
             case .wine:
                 _ = try await installer.installWine(progress: report)
+            case .steam:
+                guard let base else { return }
+                try await WindowsSteam.install(base: base, progress: report)
             case .dxmt:
                 guard let base else { return }
                 _ = try await installer.installDXMT(base: base, progress: report)

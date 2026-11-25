@@ -196,6 +196,7 @@ struct GameDetailView: View {
     private var sourceLabel: String {
         switch game.source {
         case .steam(let appID): "Steam · \(appID)"
+        case .windowsSteam(let appID): "Steam for Windows · \(appID)"
         case .macApplication: "Mac app"
         case .customFolder: "Aether Games folder"
         }

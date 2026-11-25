@@ -22,8 +22,17 @@ public struct LibraryScanner: Sendable {
         public var customDirectories: [URL]
         /// Games added by hand (installed into a bottle). Loaded fresh for every scan.
         public var manualGames: [ManualGame]
+        /// Windows Steam clients inside Wine bottles (the "steam" bottle).
+        public var windowsSteamRoots: [URL]
 
-        public init(steamRoots: [URL], applicationDirectories: [URL], customDirectories: [URL] = [], manualGames: [ManualGame] = []) {
+        public init(
+            steamRoots: [URL],
+            applicationDirectories: [URL],
+            customDirectories: [URL] = [],
+            manualGames: [ManualGame] = [],
+            windowsSteamRoots: [URL] = []
+        ) {
+            self.windowsSteamRoots = windowsSteamRoots
             self.steamRoots = steamRoots
             self.applicationDirectories = applicationDirectories
             self.customDirectories = customDirectories
@@ -40,7 +49,8 @@ public struct LibraryScanner: Sendable {
                 ],
                 // Drop Windows game folders or .exe files here; each one becomes a library entry.
                 customDirectories: [URL.documentsDirectory.appending(path: "Aether Games", directoryHint: .isDirectory)],
-                manualGames: ManualGameStore.load()
+                manualGames: ManualGameStore.load(),
+                windowsSteamRoots: [WindowsSteam.root]
             )
         }
     }
@@ -103,7 +113,8 @@ public struct LibraryScanner: Sendable {
         var seenApps = Set<String>()
         var games: [GameItem] = []
 
-        for root in configuration.steamRoots {
+        let roots = configuration.steamRoots.map { ($0, false) } + configuration.windowsSteamRoots.map { ($0, true) }
+        for (root, isWindowsClient) in roots {
             for library in Self.steamLibraries(root: root, issues: &issues) {
                 guard seenLibraries.insert(library.standardizedFileURL.path(percentEncoded: false)).inserted else { continue }
                 let steamapps = library.appending(path: "steamapps", directoryHint: .isDirectory)
@@ -115,9 +126,9 @@ public struct LibraryScanner: Sendable {
 
                 for manifest in manifests {
                     do {
-                        guard let game = try parseAppManifest(manifest, steamapps: steamapps),
+                        guard let game = try parseAppManifest(manifest, steamapps: steamapps, windowsClient: isWindowsClient),
                               let appID = game.steamAppID,
-                              seenApps.insert(appID).inserted
+                              seenApps.insert("\(isWindowsClient)-\(appID)").inserted
                         else { continue }
                         games.append(game)
                     } catch {
@@ -185,7 +196,7 @@ public struct LibraryScanner: Sendable {
         return nil
     }
 
-    func parseAppManifest(_ url: URL, steamapps: URL) throws -> GameItem? {
+    func parseAppManifest(_ url: URL, steamapps: URL, windowsClient: Bool = false) throws -> GameItem? {
         guard let text = Self.readText(url) else { throw ScanError.unreadable }
         guard let state = try VDFParser.parse(text)["AppState"],
               let appID = state["appid"]?.stringValue,
@@ -203,11 +214,26 @@ public struct LibraryScanner: Sendable {
             .appending(path: installdir, directoryHint: .isDirectory)
         let profile = catalog?.profile(steamAppID: appID)
 
+        var installation = Self.detectInstallation(in: installDirectory, executableHint: profile?.localTranslation?.executable)
+        if windowsClient {
+            // Launched through steam.exe, so the client itself is the executable that matters.
+            installation.nativeApplication = nil
+            installation.windowsExecutable = installation.windowsExecutable ?? WindowsSteam.executable
+            return GameItem(
+                id: "winsteam:\(appID)",
+                title: name,
+                source: .windowsSteam(appID: appID),
+                installation: installation,
+                installDirectory: installDirectory,
+                profileID: profile?.id,
+                bottleOverride: WindowsSteam.bottleName
+            )
+        }
         return GameItem(
             id: "steam:\(appID)",
             title: name,
             source: .steam(appID: appID),
-            installation: Self.detectInstallation(in: installDirectory, executableHint: profile?.localTranslation?.executable),
+            installation: installation,
             installDirectory: installDirectory,
             profileID: profile?.id
         )
@@ -423,7 +449,7 @@ public struct LibraryScanner: Sendable {
     static func deduplicate(_ games: [GameItem]) -> [GameItem] {
         func priority(_ source: GameItem.Source) -> Int {
             switch source {
-            case .steam: 0
+            case .steam, .windowsSteam: 0
             case .macApplication: 1
             case .customFolder: 2
             }

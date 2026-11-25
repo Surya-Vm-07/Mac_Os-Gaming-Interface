@@ -216,3 +216,32 @@ struct AddGamesDetectionTests {
         #expect(scanned.scan().games.map(\.title) == ["Celeste", "Cyberpunk 2077", "Hades"])
     }
 }
+
+@Suite("Steam for Windows library")
+struct WindowsSteamLibraryTests {
+    @Test("Games in a bottle's Windows Steam client become .windowsSteam items bound to the steam bottle")
+    func windowsSteamGames() throws {
+        let lib = try FakeLibrary()
+        defer { lib.cleanUp() }
+        let steamRoot = lib.url("Bottles/steam/drive_c/Program Files (x86)/Steam")
+        // libraryfolders.vdf written by Windows Steam uses C:\ paths; they must map into drive_c.
+        try lib.file("Bottles/steam/drive_c/Program Files (x86)/Steam/steamapps/libraryfolders.vdf", #"""
+        "libraryfolders" { "0" { "path" "C:\\Program Files (x86)\\Steam" } }
+        """#)
+        try lib.file("Bottles/steam/drive_c/Program Files (x86)/Steam/steamapps/appmanifest_200260.acf",
+                     FakeLibrary.manifest(appID: "200260", name: "Batman: Arkham City GOTY", installdir: "Batman Arkham City GOTY"))
+        try lib.file("Bottles/steam/drive_c/Program Files (x86)/Steam/steamapps/common/Batman Arkham City GOTY/Binaries/Win32/BatmanAC.exe", bytes: 500)
+
+        let scanner = LibraryScanner(configuration: .init(steamRoots: [], applicationDirectories: [], windowsSteamRoots: [steamRoot]))
+        let result = scanner.scan()
+        let game = try #require(result.games.first)
+        #expect(result.games.count == 1, "the C:\\ library path maps back to the same root and is not double-counted")
+        #expect(game.id == "winsteam:200260")
+        #expect(game.source == .windowsSteam(appID: "200260"))
+        #expect(game.steamAppID == "200260", "real Steam artwork still applies")
+        #expect(game.bottleName == "steam")
+        #expect(game.installation.nativeApplication == nil)
+        #expect(game.installation.windowsExecutable?.lastPathComponent == "BatmanAC.exe")
+        #expect(WindowsSteam.launchArguments(appID: "200260").suffix(2) == ["-applaunch", "200260"])
+    }
+}

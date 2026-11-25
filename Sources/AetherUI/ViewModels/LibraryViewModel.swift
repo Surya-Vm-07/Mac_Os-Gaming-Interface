@@ -276,8 +276,12 @@ public final class LibraryViewModel {
 
     /// Routes and starts `game`. Local (Wine) launches suspend until the whole prefix exits.
     public func play(_ game: GameItem, preference: RoutingPreference = .automatic) async -> LaunchOutcome {
-        guard !isGameRunning else {
-            statusMessage = "\(runningGameTitle ?? "A game") is still running."
+        let isWindowsSteamGame: Bool = { if case .windowsSteam = game.source { return true } else { return false } }()
+        // An open Steam window is not a game: Steam games may launch over it (the client restarts).
+        guard !isGameRunning || (steamClientOpen && isWindowsSteamGame) else {
+            statusMessage = steamClientOpen
+                ? "Steam for Windows is open. Close it (Quick Access → Force Quit) to start a non-Steam game."
+                : "\(runningGameTitle ?? "A game") is still running."
             return .failed
         }
         guard launchingGameID == nil else { return .failed } // a click while something is starting
@@ -388,12 +392,23 @@ public final class LibraryViewModel {
     }
 
     private func launchLocal(_ game: GameItem) async -> Bool {
-        guard let executable = game.installation.windowsExecutable else {
+        guard var executable = game.installation.windowsExecutable else {
             statusMessage = "No Windows executable found for \(game.title)."
             return false
         }
         let prefix = AetherPaths.bottle(for: game.bottleName)
         var translation = profile(for: game).localTranslation ?? LocalTranslationConfig()
+        // Games from Steam for Windows start through the client, so Steam's DRM check passes.
+        var steamAppID: String?
+        if case .windowsSteam(let appID) = game.source {
+            guard WindowsSteam.isInstalled else {
+                statusMessage = "Steam for Windows isn't installed. Engine Setup → Steam for Windows → Install."
+                return false
+            }
+            steamAppID = appID
+            executable = WindowsSteam.executable
+            translation.launchArgs = WindowsSteam.launchArguments(appID: appID)
+        }
         let chosenPreset = preset(for: game)
         var activePreset = chosenPreset
         let runtime: BottleRuntime
@@ -415,6 +430,14 @@ public final class LibraryViewModel {
                 }
                 translation.backend = backend
                 let wine = try runtimeStore.resolve(baseID: base.id, backend: backend)
+                if steamAppID != nil {
+                    // Steam may already be running with another graphics stack; one prefix can only
+                    // have one wineserver, so restart the client with this game's runtime.
+                    statusMessage = "Starting Steam for \(game.title)…"
+                    var environment = ProcessInfo.processInfo.environment
+                    environment["WINEPREFIX"] = prefix.path(percentEncoded: false)
+                    _ = await WinePrefix.run(base.wineserver, ["-k"], environment: environment)
+                }
                 if !WinePrefix.isInitialized(prefix) {
                     statusMessage = "Creating a Windows bottle for \(game.title)… (first launch only)"
                     try await WinePrefix.initialize(prefix, runtime: wine)
@@ -442,6 +465,7 @@ public final class LibraryViewModel {
                 preset: activePreset
             ))
             recordLaunch(game)
+            steamClientOpen = false
             runningGameTitle = game.title
             launchingGameID = nil
             libraryShownDuringSession = false
@@ -584,6 +608,55 @@ public final class LibraryViewModel {
         }
         defer { refreshRuntimes() }
         try await work(progress)
+    }
+
+    // MARK: - Steam for Windows
+
+    /// True while the Steam client window (not a game) is the running session.
+    public private(set) var steamClientOpen = false
+
+    /// Opens the Windows Steam client (sign in, install games, settings). Its window is Steam's own.
+    public func openWindowsSteam() async {
+        guard WindowsSteam.isInstalled else {
+            statusMessage = "Install Steam for Windows first (Engine Setup)."
+            return
+        }
+        refreshRuntimes()
+        guard let base = wineBase else {
+            statusMessage = String(describing: WineRuntimeError.noRuntime)
+            return
+        }
+        guard !isGameRunning else {
+            statusMessage = "\(runningGameTitle ?? "A game") is still running."
+            return
+        }
+        do {
+            let engine = BottleEngine(runtime: BottleRuntime(runtime: base))
+            bottleEngine = engine
+            let events = try await engine.launch(BottleLaunchRequest(
+                executable: WindowsSteam.executable,
+                bottle: WindowsSteam.bottle,
+                translation: LocalTranslationConfig(backend: .wined3d, launchArgs: WindowsSteam.clientFlags),
+                metalHUDEnabled: false,
+                preset: .compatibility
+            ))
+            runningGameTitle = "Steam"
+            steamClientOpen = true
+            // Keep the library visible: the user is browsing Steam, not playing yet.
+            libraryShownDuringSession = true
+            statusMessage = "Steam is opening in its own window. Sign in and install games; they appear here when you rescan (⌘R)."
+            for await _ in events {}
+            // A Steam game may have taken over this session; only clear what is still ours.
+            if steamClientOpen {
+                steamClientOpen = false
+                if runningGameTitle == "Steam" { runningGameTitle = nil }
+            }
+            await refresh()
+        } catch {
+            steamClientOpen = false
+            runningGameTitle = nil
+            statusMessage = String(describing: error)
+        }
     }
 
     // MARK: - Bottles

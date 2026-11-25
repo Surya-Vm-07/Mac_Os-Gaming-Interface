@@ -24,7 +24,8 @@ and needs no servers.
 | 5b | Way back to Home from every screen (stream exit bar, Back to Library, drawer row, ‹ Home); Bottles page: run installers, add installed games, stop, delete | **Implemented, awaiting macOS build** |
 | 5c | One-click play from banner, covers and tiles; Play auto-installs Rosetta/Wine/DXMT/DXVK and falls back from D3DMetal; launch spinners | **Implemented, awaiting macOS build** |
 | 5d | Add Games (folder / SSD / single game / .exe), Game Folders list, Steam-less Mac game launch | **Implemented, awaiting macOS build** |
-| 5e | Delete `launcher/`, licensing, Settings | Next |
+| 5e | Steam for Windows: install client in a bottle, sign in, library import with artwork, one-click launch through Steam | **Implemented, awaiting macOS build** |
+| 5f | Delete `launcher/`, licensing, Settings | Next |
 
 ## Requirements
 
@@ -67,6 +68,14 @@ features are ported here. Both share `~/Library/Application Support/Aether Launc
 Drive formats: APFS / exFAT work. NTFS drives are read-only on macOS, so games that write saves or
 settings next to the .exe can fail from them; copy those games to APFS / exFAT.
 Games installed with a `setup.exe`: Bottles (⌘4) → create a bottle → Run Installer → Add Game.
+
+### Your Steam account (Windows games)
+
+Engine Setup (⌘3) → **Steam for Windows** → Install, then **Open Steam**. Sign in inside Steam's own
+window (Aether never sees your password) and install your Windows games there. They appear in the
+library with Steam artwork. Clicking one restarts the Steam client with that game's graphics stack
+and runs `steam.exe -applaunch <appid>`, so Steam's DRM check passes. Steam keeps running after the
+game closes; stop it with Quick Access → Force Quit.
 
 ## Run the shell (Phase 2)
 

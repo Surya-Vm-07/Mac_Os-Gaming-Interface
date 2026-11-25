@@ -310,7 +310,12 @@ public final class ShellCoordinator {
         case .move(.down): setup.move(1)
         case .move(.left): zone = .sidebar
         case .move(.right): break
-        case .confirm: Task { await setup.perform(setup.focusedStep) }
+        case .confirm:
+            if setup.focusedStep == .steam, setup.isDone(.steam) {
+                Task { await library.openWindowsSteam() }
+            } else {
+                Task { await setup.perform(setup.focusedStep) }
+            }
         case .back: goHome()
         case .tertiary: setup.refresh()
         case .secondary, .toggleDrawer, .previousTab, .nextTab: break

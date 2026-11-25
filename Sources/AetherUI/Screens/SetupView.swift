@@ -31,7 +31,8 @@ struct SetupView: View {
                         SetupRow(
                             step: step,
                             setup: setup,
-                            isFocused: shell.zone == .content && index == setup.focusedIndex
+                            isFocused: shell.zone == .content && index == setup.focusedIndex,
+                            openSteam: { Task { await shell.library.openWindowsSteam() } }
                         )
                         .onTapGesture { setup.focus(step) }
                     }
@@ -77,6 +78,7 @@ private struct SetupRow: View {
     let step: SetupModel.Step
     let setup: SetupModel
     let isFocused: Bool
+    let openSteam: () -> Void
 
     var body: some View {
         let done = setup.isDone(step)
@@ -108,6 +110,16 @@ private struct SetupRow: View {
 
             if setup.busyStep == step {
                 ProgressView().controlSize(.small)
+            } else if done, step == .steam {
+                Button(action: openSteam) {
+                    Label("Open Steam", systemImage: "arrow.up.forward.app")
+                        .font(.system(size: 13, weight: .bold))
+                        .foregroundStyle(.white)
+                        .padding(.horizontal, 14)
+                        .padding(.vertical, 8)
+                        .background(RoundedRectangle(cornerRadius: 7, style: .continuous).fill(AetherTheme.accent))
+                }
+                .buttonStyle(.plain)
             } else if done {
                 Image(systemName: "checkmark.circle.fill")
                     .font(.system(size: 20))

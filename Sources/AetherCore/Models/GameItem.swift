@@ -4,6 +4,8 @@ import Foundation
 public struct GameItem: Identifiable, Sendable, Hashable {
     public enum Source: Sendable, Hashable {
         case steam(appID: String)
+        /// Installed through the Windows Steam client in the "steam" bottle; launched via that client.
+        case windowsSteam(appID: String)
         case macApplication
         case customFolder
     }
@@ -38,8 +40,10 @@ public struct GameItem: Identifiable, Sendable, Hashable {
     }
 
     public var steamAppID: String? {
-        if case .steam(let appID) = source { return appID }
-        return nil
+        switch source {
+        case .steam(let appID), .windowsSteam(let appID): return appID
+        case .macApplication, .customFolder: return nil
+        }
     }
 
     /// Characters safe for a bottle folder name.
