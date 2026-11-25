@@ -109,10 +109,10 @@ Sources/AetherCore/
   Services/LibraryScanner             Steam libraries (incl. Wine-prefix Steam), Games apps, custom folders
   Services/ArtworkFetcher             SteamGridDB + Steam CDN → disk cache (file URLs only)
   Services/SecretStore                Keychain-backed API keys
-Sources/AetherUI/                     Theme, ExecutionBadge, GameCardView, ImagePipeline, LibraryHomeView, LibraryViewModel
-Sources/AetherApp/                    SwiftPM dev host for the SwiftUI shell
   Resources/Profiles/game_profiles.json
   Resources/Scripts/launch_d3dmetal.sh
+Sources/AetherUI/                     Theme, ExecutionBadge, GameCardView, ImagePipeline, LibraryHomeView, LibraryViewModel
+Sources/AetherApp/                    SwiftPM dev host for the SwiftUI shell
 Sources/AetherCLI/                    Phase 1 proof-of-concept CLI
 Tests/AetherCoreTests/                Swift Testing suites
 ```
@@ -120,7 +120,7 @@ Tests/AetherCoreTests/                Swift Testing suites
 ## Signed app target (when you are ready to distribute)
 
 SwiftPM cannot produce a signed `.app` with entitlements, so the SwiftUI shell gets an Xcode app
-target that links `AetherCore`:
+target that links `AetherUI`:
 
 1. In Xcode, choose **File → New → Project → macOS → App**. Name it `Aether`, set Interface to
    SwiftUI and Language to Swift. Save it in `App/`.
