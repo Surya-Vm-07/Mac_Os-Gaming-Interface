@@ -37,6 +37,10 @@ struct AetherApp: App {
                     .keyboardShortcut("2", modifiers: [.command])
                 Button("Engine Setup") { shell.open(.setup) }
                     .keyboardShortcut("3", modifiers: [.command])
+                Button("Bottles") { shell.open(.bottles) }
+                    .keyboardShortcut("4", modifiers: [.command])
+                Button("Go to Library") { shell.goToLibrary() }
+                    .keyboardShortcut("l", modifiers: [.command, .shift])
                 Divider()
                 Button("Quick Access Drawer") { shell.toggleDrawer() }
                     .keyboardShortcut("g", modifiers: [.command, .shift])

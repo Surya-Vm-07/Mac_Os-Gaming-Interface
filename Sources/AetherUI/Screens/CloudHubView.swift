@@ -8,6 +8,7 @@ struct CloudHubView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 30) {
+            HomeBackButton(shell: shell)
             VStack(alignment: .leading, spacing: 10) {
                 Text("CLOUD GAMING")
                     .font(AetherTheme.mono(12, weight: .bold))

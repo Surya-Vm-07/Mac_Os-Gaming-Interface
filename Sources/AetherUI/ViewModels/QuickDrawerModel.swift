@@ -11,6 +11,7 @@ public final class QuickDrawerModel {
     public enum Row: Hashable, Sendable {
         case metalHUD
         case audio(AudioDeviceID)
+        case library
         case endStream
         case forceQuit
         case close
@@ -26,6 +27,7 @@ public final class QuickDrawerModel {
     /// Set by the coordinator: closing returns the user to their game.
     @ObservationIgnored public var onCloseRequest: (@MainActor () -> Void)?
     @ObservationIgnored public var onEndStream: (@MainActor () -> Void)?
+    @ObservationIgnored public var onGoToLibrary: (@MainActor () -> Void)?
 
     @ObservationIgnored private let library: LibraryViewModel
     @ObservationIgnored private var sampler = SystemTelemetry()
@@ -36,7 +38,7 @@ public final class QuickDrawerModel {
     }
 
     public var rows: [Row] {
-        var rows: [Row] = [.metalHUD]
+        var rows: [Row] = [.library, .metalHUD]
         rows += audioDevices.map { .audio($0.id) }
         if library.activeStream != nil { rows.append(.endStream) }
         if library.canForceQuit { rows.append(.forceQuit) }
@@ -93,6 +95,8 @@ public final class QuickDrawerModel {
             if AudioOutputs.setDefaultOutput(id) {
                 defaultOutputID = id
             }
+        case .library:
+            onGoToLibrary?()
         case .endStream:
             onEndStream?()
         case .forceQuit:

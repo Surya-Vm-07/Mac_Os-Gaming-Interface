@@ -21,7 +21,8 @@ and needs no servers.
 | 4 | Launcher redesign (sidebar, game page), Cloud hub + in-app streaming | **Implemented, awaiting macOS build** |
 | 4b | Local Windows games via setup-wizard runtimes: per-game presets (Max FPS, DX12 AAA, DX11 DXMT, Compatibility), auto bottles, DXVK sync | **Implemented, awaiting macOS build** |
 | 5a | Native Engine Setup page in Swift; unified cool palette, no glows; real native-launch errors | **Implemented, awaiting macOS build** |
-| 5b | Bottle manager, delete `launcher/`, licensing, Settings | Next |
+| 5b | Way back to Home from every screen (stream exit bar, Back to Library, drawer row, ‹ Home); Bottles page: run installers, add installed games, stop, delete | **Implemented, awaiting macOS build** |
+| 5c | Delete `launcher/`, licensing, Settings | Next |
 
 ## Requirements
 

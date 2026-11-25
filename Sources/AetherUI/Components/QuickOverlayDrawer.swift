@@ -65,6 +65,7 @@ public struct QuickOverlayDrawer: View {
         switch row {
         case .metalHUD: "Metal Performance HUD"
         case .audio(let id): drawer.audioDevices.first { $0.id == id }?.name ?? "Audio device"
+        case .library: "Go to Library"
         case .endStream: "End Cloud Stream"
         case .forceQuit: "Force Quit Game"
         case .close: drawer.sessionTitle == nil ? "Close" : "Return to Game"
@@ -75,6 +76,7 @@ public struct QuickOverlayDrawer: View {
         switch row {
         case .metalHUD: drawer.metalHUDEnabled ? "ON · next launch" : "OFF"
         case .audio(let id): id == drawer.defaultOutputID ? "OUTPUT ●" : nil
+        case .library: drawer.sessionTitle == nil ? nil : "GAME KEEPS RUNNING"
         case .endStream, .forceQuit, .close: nil
         }
     }

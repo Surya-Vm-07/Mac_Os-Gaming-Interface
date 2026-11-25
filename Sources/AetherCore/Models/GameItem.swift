@@ -16,6 +16,8 @@ public struct GameItem: Identifiable, Sendable, Hashable {
     public var installDirectory: URL?
     /// Matching `GameProfile.id`, if a curated profile exists.
     public var profileID: String?
+    /// Bottle this game must run in (set for games installed into a specific bottle).
+    public var bottleOverride: String?
 
     public init(
         id: String,
@@ -23,8 +25,10 @@ public struct GameItem: Identifiable, Sendable, Hashable {
         source: Source,
         installation: GameInstallation,
         installDirectory: URL? = nil,
-        profileID: String? = nil
+        profileID: String? = nil,
+        bottleOverride: String? = nil
     ) {
+        self.bottleOverride = bottleOverride
         self.id = id
         self.title = title
         self.source = source
@@ -40,6 +44,7 @@ public struct GameItem: Identifiable, Sendable, Hashable {
 
     /// Characters safe for a bottle folder name.
     public var bottleName: String {
+        if let bottleOverride { return bottleOverride }
         if let profileID { return profileID }
         return String(id.map { $0.isLetter || $0.isNumber ? $0 : "-" })
     }

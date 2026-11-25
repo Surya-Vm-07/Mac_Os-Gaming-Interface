@@ -120,6 +120,7 @@ private struct SidebarRow: View {
         case .home: "Home"
         case .cloudHub: "Cloud Gaming"
         case .setup: "Engine Setup"
+        case .bottles: "Bottles"
         case .game(let id): shell.library.game(withID: id)?.title ?? "Unknown"
         }
     }
@@ -131,6 +132,8 @@ private struct SidebarRow: View {
             Image(systemName: "house.fill").frame(width: 22).foregroundStyle(.white.opacity(0.8))
         case .cloudHub:
             Image(systemName: "icloud.fill").frame(width: 22).foregroundStyle(AetherTheme.violet)
+        case .bottles:
+            Image(systemName: "shippingbox.fill").frame(width: 22).foregroundStyle(.white.opacity(0.8))
         case .setup:
             Image(systemName: "wrench.and.screwdriver.fill").frame(width: 22)
                 .foregroundStyle(shell.setup.isReady ? Color.white.opacity(0.8) : AetherTheme.amber)

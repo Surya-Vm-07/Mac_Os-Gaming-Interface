@@ -23,7 +23,8 @@ public struct RootView: View {
             if let service = shell.library.activeStream {
                 CloudStreamView(service: service)
                     .ignoresSafeArea()
-            } else if shell.library.isGameRunning {
+                StreamExitBar(service: service, shell: shell)
+            } else if shell.library.showsRunningScreen {
                 GameRunningView(library: shell.library)
             } else {
                 HStack(spacing: 0) {
@@ -92,6 +93,8 @@ public struct RootView: View {
             CloudHubView(shell: shell)
         case .setup:
             SetupView(shell: shell)
+        case .bottles:
+            BottlesView(shell: shell)
         }
     }
 

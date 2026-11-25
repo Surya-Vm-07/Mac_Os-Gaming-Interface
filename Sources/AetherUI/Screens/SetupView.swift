@@ -11,6 +11,7 @@ struct SetupView: View {
     var body: some View {
         ScrollView(.vertical, showsIndicators: false) {
             VStack(alignment: .leading, spacing: 28) {
+                HomeBackButton(shell: shell)
                 VStack(alignment: .leading, spacing: 10) {
                     Text("ENGINE SETUP")
                         .font(AetherTheme.mono(11, weight: .bold))

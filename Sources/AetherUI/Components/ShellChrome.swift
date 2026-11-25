@@ -66,11 +66,14 @@ struct GameRunningView: View {
             Text("Launcher UI suspended to free memory. ⌂ / ⇧⌘G for Quick Access.")
                 .font(AetherTheme.mono(12))
                 .foregroundStyle(.white.opacity(0.5))
-            Button("Force Quit") {
-                Task { await library.forceQuitActiveGame() }
+            HStack(spacing: 12) {
+                GhostButton(title: "Back to Library", systemImage: "square.grid.2x2") {
+                    library.showLibraryDuringSession()
+                }
+                GhostButton(title: "Force Quit", systemImage: "xmark.octagon") {
+                    Task { await library.forceQuitActiveGame() }
+                }
             }
-            .buttonStyle(.borderedProminent)
-            .tint(.red)
             .padding(.top, 8)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -242,5 +245,69 @@ enum PlayStats {
         if minutes < 1 { return "—" }
         if minutes < 60 { return "\(minutes) min" }
         return String(format: "%.1f h", seconds / 3600)
+    }
+}
+
+/// "‹ Home" at the top of every secondary page: one click (or Ⓑ) back to the dashboard.
+struct HomeBackButton: View {
+    let shell: ShellCoordinator
+
+    @State private var isHovered = false
+
+    var body: some View {
+        Button { shell.goHome() } label: {
+            HStack(spacing: 6) {
+                Image(systemName: "chevron.left").font(.system(size: 12, weight: .bold))
+                Text("Home").font(.system(size: 13, weight: .semibold))
+                Text("Ⓑ / Esc").font(AetherTheme.mono(10)).foregroundStyle(.white.opacity(0.4))
+            }
+            .foregroundStyle(.white.opacity(isHovered ? 1 : 0.75))
+            .padding(.horizontal, 12)
+            .padding(.vertical, 7)
+            .background(Capsule().fill(Color.white.opacity(isHovered ? 0.12 : 0.06)))
+            .overlay(Capsule().strokeBorder(AetherTheme.hairline))
+        }
+        .buttonStyle(.plain)
+        .onHover { isHovered = $0 }
+    }
+}
+
+/// Always-visible exit for in-app cloud streams (top-left, compact so it doesn't cover the game).
+struct StreamExitBar: View {
+    let service: CloudService
+    let shell: ShellCoordinator
+
+    var body: some View {
+        VStack {
+            HStack(spacing: 8) {
+                Button { shell.endStream() } label: {
+                    Label("Library", systemImage: "chevron.left")
+                        .font(.system(size: 12, weight: .bold))
+                }
+                .buttonStyle(.plain)
+                .help("End the stream and go back to the Home dashboard (⇧⌘W)")
+
+                Rectangle().fill(Color.white.opacity(0.2)).frame(width: 1, height: 14)
+
+                Text(service.displayName)
+                    .font(AetherTheme.mono(11, weight: .semibold))
+                    .foregroundStyle(.white.opacity(0.6))
+
+                Button { shell.toggleDrawer() } label: {
+                    Image(systemName: "slider.horizontal.3").font(.system(size: 12, weight: .bold))
+                }
+                .buttonStyle(.plain)
+                .help("Quick Access (⇧⌘G)")
+            }
+            .foregroundStyle(.white)
+            .padding(.horizontal, 14)
+            .padding(.vertical, 8)
+            .background(.ultraThinMaterial, in: Capsule())
+            .overlay(Capsule().strokeBorder(AetherTheme.hairline))
+            .padding(.top, 12)
+            .padding(.leading, 84) // clear of the window's traffic lights
+            .frame(maxWidth: .infinity, alignment: .leading)
+            Spacer()
+        }
     }
 }

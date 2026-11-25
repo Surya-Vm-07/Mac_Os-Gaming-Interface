@@ -192,7 +192,7 @@ public enum WinePrefix {
     }
 
     /// Runs a tool to completion without blocking a thread. Returns its exit status (-1 if it could not start).
-    static func run(_ executable: URL, _ arguments: [String], environment: [String: String]) async -> Int32 {
+    public static func run(_ executable: URL, _ arguments: [String], environment: [String: String]) async -> Int32 {
         let process = Process()
         process.executableURL = executable
         process.arguments = arguments

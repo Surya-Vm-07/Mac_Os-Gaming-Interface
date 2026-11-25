@@ -8,6 +8,7 @@ public enum ShellRoute: Hashable, Sendable {
     case game(GameItem.ID)
     case cloudHub
     case setup
+    case bottles
 }
 
 /// Which half of the window the controller is driving.
@@ -20,6 +21,7 @@ public enum SidebarEntry: Hashable, Sendable {
     case home
     case cloudHub
     case setup
+    case bottles
     case game(GameItem.ID)
 }
 
@@ -77,6 +79,7 @@ public final class ShellCoordinator {
         started = true
         drawer.onCloseRequest = { [weak self] in self?.toggleDrawer() }
         drawer.onEndStream = { [weak self] in self?.endStream() }
+        drawer.onGoToLibrary = { [weak self] in self?.goToLibrary() }
         gamepad.onCommand = { [weak self] command in self?.handle(command) }
         gamepad.start()
     }
@@ -90,7 +93,7 @@ public final class ShellCoordinator {
     }
 
     /// Fixed entries above the game list.
-    public static let browseEntries: [SidebarEntry] = [.home, .cloudHub, .setup]
+    public static let browseEntries: [SidebarEntry] = [.home, .cloudHub, .setup, .bottles]
 
     public var sidebarEntries: [SidebarEntry] {
         Self.browseEntries + filteredGames.map { .game($0.id) }
@@ -105,7 +108,7 @@ public final class ShellCoordinator {
 
     public func isSelected(_ entry: SidebarEntry) -> Bool {
         switch (entry, route) {
-        case (.home, .home), (.cloudHub, .cloudHub), (.setup, .setup): true
+        case (.home, .home), (.cloudHub, .cloudHub), (.setup, .setup), (.bottles, .bottles): true
         case (.game(let a), .game(let b)): a == b
         default: false
         }
@@ -118,6 +121,7 @@ public final class ShellCoordinator {
         case .home: route = .home
         case .cloudHub: route = .cloudHub
         case .setup: route = .setup
+        case .bottles: route = .bottles
         case .game(let id):
             library.focus(gameID: id)
             route = .game(id)
@@ -176,10 +180,27 @@ public final class ShellCoordinator {
         library.startStream(service)
     }
 
+    /// Ends the cloud stream and lands on the Home dashboard.
     public func endStream() {
         library.endStream()
         drawer.dismiss()
-        rootFocusToken += 1
+        goHome()
+    }
+
+    /// Always gets the user back to the Home dashboard: ends a stream, or shows the library over a
+    /// running Wine game (which keeps running), or brings Aether forward over a native game.
+    public func goToLibrary() {
+        if library.activeStream != nil {
+            endStream()
+            return
+        }
+        if library.isGameRunning {
+            library.showLibraryDuringSession()
+        }
+        drawer.dismiss()
+        NSApp.unhide(nil)
+        NSApp.activate()
+        goHome()
     }
 
     public func setDefaultCloudService(_ service: CloudService) {
@@ -213,6 +234,11 @@ public final class ShellCoordinator {
         }
         // During a stream the web page reads the controller through the Gamepad API.
         guard library.activeStream == nil else { return }
+        // "Game running" screen: Ⓐ or Ⓑ shows the library (the game keeps running).
+        if library.showsRunningScreen {
+            if command == .confirm || command == .back { goToLibrary() }
+            return
+        }
 
         switch zone {
         case .sidebar: handleSidebar(command)
@@ -254,6 +280,27 @@ public final class ShellCoordinator {
             handleCloudHub(command)
         case .setup:
             handleSetup(command)
+        case .bottles:
+            handleBottles(command)
+        }
+    }
+
+    // MARK: Bottles page focus
+
+    public private(set) var bottleIndex = 0
+
+    public func focusBottle(_ index: Int) {
+        bottleIndex = index
+    }
+
+    private func handleBottles(_ command: GamepadCommand) {
+        let count = BottleStore.list().count
+        switch command {
+        case .move(.up): bottleIndex = max(bottleIndex - 1, 0)
+        case .move(.down): bottleIndex = min(bottleIndex + 1, max(count - 1, 0))
+        case .move(.left): zone = .sidebar
+        case .back: goHome()
+        case .move(.right), .confirm, .secondary, .tertiary, .toggleDrawer, .previousTab, .nextTab: break
         }
     }
 

@@ -150,6 +150,17 @@ public final class LibraryViewModel {
 
     public var isGameRunning: Bool { runningGameTitle != nil }
 
+    /// "Back to Library" during a Wine session: show the launcher while the game keeps running.
+    public private(set) var libraryShownDuringSession = false
+
+    /// Whether the full-screen "game running" page should replace the launcher.
+    public var showsRunningScreen: Bool { isGameRunning && !libraryShownDuringSession }
+
+    public func showLibraryDuringSession() {
+        libraryShownDuringSession = true
+        statusMessage = "\(runningGameTitle ?? "Your game") is still running. ⌂ or ⇧⌘G → Force Quit to stop it."
+    }
+
     /// Title shown in the Quick Drawer's session header.
     public var activeSessionTitle: String? {
         runningGameTitle ?? nativeSession?.title ?? activeStream?.displayName
@@ -168,7 +179,8 @@ public final class LibraryViewModel {
         isScanning = true
         defer { isScanning = false }
 
-        let configuration = scannerConfiguration
+        var configuration = scannerConfiguration
+        configuration.manualGames = ManualGameStore.load() // pick up games added since launch
         let catalog = catalog
         let result = await Task.detached(priority: .userInitiated) {
             LibraryScanner(configuration: configuration, catalog: catalog).scan()
@@ -291,7 +303,7 @@ public final class LibraryViewModel {
             recordLaunch(game)
             statusMessage = "\(service.displayName): search for “\(game.title)”. Press ⌂ or ⇧⌘G for Quick Access."
         } else {
-            statusMessage = "Press ⌂ or ⇧⌘G for Quick Access and End Stream."
+            statusMessage = "‹ Library (top-left) or ⇧⌘W returns to Home. ⌂ or ⇧⌘G opens Quick Access."
         }
         ImagePipeline.shared.purge()
         activeStream = service
@@ -414,6 +426,7 @@ public final class LibraryViewModel {
             ))
             recordLaunch(game)
             runningGameTitle = game.title
+            libraryShownDuringSession = false
             statusMessage = nil
             ImagePipeline.shared.purge()
             let started = ContinuousClock.now
@@ -434,6 +447,67 @@ public final class LibraryViewModel {
             statusMessage = String(describing: error)
             return false
         }
+    }
+
+    // MARK: - Bottles
+
+    /// Runs any Windows program (usually an installer) inside a bottle with plain WineD3D:
+    /// the most compatible setup, and installers don't need fast graphics.
+    public func runExecutable(_ executable: URL, inBottle bottle: BottleInfo) async {
+        guard !isGameRunning else {
+            statusMessage = "\(runningGameTitle ?? "A game") is still running."
+            return
+        }
+        refreshRuntimes()
+        guard let base = wineBase else {
+            statusMessage = String(describing: WineRuntimeError.noRuntime)
+            return
+        }
+        do {
+            if !WinePrefix.isInitialized(bottle.url) {
+                statusMessage = "Preparing bottle \(bottle.id)… (first run only)"
+                try await WinePrefix.initialize(bottle.url, runtime: base)
+            }
+            let engine = BottleEngine(runtime: BottleRuntime(runtime: base))
+            bottleEngine = engine
+            let events = try await engine.launch(BottleLaunchRequest(
+                executable: executable,
+                bottle: bottle.url,
+                translation: LocalTranslationConfig(backend: .wined3d),
+                metalHUDEnabled: false,
+                preset: .compatibility
+            ))
+            runningGameTitle = executable.deletingPathExtension().lastPathComponent
+            libraryShownDuringSession = false
+            statusMessage = nil
+            for await _ in events {}
+            runningGameTitle = nil
+            statusMessage = "Finished. If it installed a game, use Bottles → Add Game to put it in your library."
+        } catch {
+            runningGameTitle = nil
+            statusMessage = String(describing: error)
+        }
+    }
+
+    /// Adds a game installed inside a bottle to the library; it will always run in that bottle.
+    public func addManualGame(title: String, executable: URL, bottle: BottleInfo) async {
+        do {
+            try ManualGameStore.add(ManualGame(title: title, executable: executable, bottle: bottle.id))
+            statusMessage = "Added \(title) to your library."
+            await refresh()
+        } catch {
+            statusMessage = "Couldn't save \(title): \(error.localizedDescription)"
+        }
+    }
+
+    /// Kills every Wine process in a bottle (hung game, stuck wineserver).
+    public func stopBottle(_ bottle: BottleInfo) async {
+        refreshRuntimes()
+        guard let base = wineBase else { return }
+        var environment = ProcessInfo.processInfo.environment
+        environment["WINEPREFIX"] = bottle.url.path(percentEncoded: false)
+        _ = await WinePrefix.run(base.wineserver, ["-k"], environment: environment)
+        statusMessage = "Stopped everything running in \(bottle.id)."
     }
 
     private func recordLaunch(_ game: GameItem) {

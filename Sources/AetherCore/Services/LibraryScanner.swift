@@ -20,11 +20,14 @@ public struct LibraryScanner: Sendable {
         public var steamRoots: [URL]
         public var applicationDirectories: [URL]
         public var customDirectories: [URL]
+        /// Games added by hand (installed into a bottle). Loaded fresh for every scan.
+        public var manualGames: [ManualGame]
 
-        public init(steamRoots: [URL], applicationDirectories: [URL], customDirectories: [URL] = []) {
+        public init(steamRoots: [URL], applicationDirectories: [URL], customDirectories: [URL] = [], manualGames: [ManualGame] = []) {
             self.steamRoots = steamRoots
             self.applicationDirectories = applicationDirectories
             self.customDirectories = customDirectories
+            self.manualGames = manualGames
         }
 
         /// macOS Steam plus both Applications folders.
@@ -36,7 +39,8 @@ public struct LibraryScanner: Sendable {
                     URL.homeDirectory.appending(path: "Applications", directoryHint: .isDirectory),
                 ],
                 // Drop Windows game folders or .exe files here; each one becomes a library entry.
-                customDirectories: [URL.documentsDirectory.appending(path: "Aether Games", directoryHint: .isDirectory)]
+                customDirectories: [URL.documentsDirectory.appending(path: "Aether Games", directoryHint: .isDirectory)],
+                manualGames: ManualGameStore.load()
             )
         }
     }
@@ -72,6 +76,19 @@ public struct LibraryScanner: Sendable {
         var games = scanSteam(issues: &issues)
         games += scanApplications()
         games += scanCustomFolders()
+        games += configuration.manualGames
+            .filter { FileManager.default.fileExists(atPath: $0.executable.path(percentEncoded: false)) }
+            .map { manual in
+                GameItem(
+                    id: "manual:\(manual.id)",
+                    title: manual.title,
+                    source: .customFolder,
+                    installation: GameInstallation(windowsExecutable: manual.executable),
+                    installDirectory: manual.executable.deletingLastPathComponent(),
+                    profileID: profileID(matchingTitle: manual.title),
+                    bottleOverride: manual.bottle
+                )
+            }
         let merged = Self.deduplicate(games).sorted {
             $0.title.localizedCaseInsensitiveCompare($1.title) == .orderedAscending
         }
